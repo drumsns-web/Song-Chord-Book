@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Song Chord Book</title>
+  <link rel="icon" href="icon.png" type="image/png">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #020714;
+      --navy: #07143a;
+      --navy-2: #0d2466;
+      --panel: rgba(8, 22, 58, .78);
+      --panel-2: rgba(255, 255, 255, .08);
+      --line: rgba(198, 222, 255, .18);
+      --text: #f7fbff;
+      --muted: #9eb6d8;
+      --cyan: #28f2ee;
+      --cyan-2: #72ffff;
+      --paper: #fbfdff;
+      --ink: #10204b;
+      --shadow: 0 28px 80px rgba(0, 0, 0, .36);
+      --radius: 8px;
+      font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 22% 0%, rgba(50, 84, 255, .48), transparent 34%),
+        radial-gradient(circle at 82% 22%, rgba(40, 242, 238, .16), transparent 28%),
+        linear-gradient(135deg, #020714 0%, #07143a 42%, #020714 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.75), transparent 82%);
+    }
+
+    button,
+    select,
+    textarea,
+    input {
+      font: inherit;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--text);
+      background: rgba(255, 255, 255, .08);
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(40, 242, 238, .58);
+      background: rgba(40, 242, 238, .12);
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(310px, 390px) minmax(0, 1fr);
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 24px;
+      border-right: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(3, 10, 31, .92), rgba(6, 18, 50, .84));
+      backdrop-filter: blur(18px);
+    }
+
+    main {
+      min-width: 0;
+      padding: 28px;
+    }
+
+    .brand {
+      display: grid;
+      grid-template-columns: 74px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .brand img {
+      width: 74px;
+      height: 74px;
+      border-radius: 19px;
+      box-shadow: 0 18px 34px rgba(0, 0, 0, .36), 0 0 28px rgba(40, 242, 238, .2);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+
+    .tagline {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .control {
+      display: grid;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    label {
+      color: #bfd1f0;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    select,
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, .08);
+      color: var(--text);
+      outline: none;
+    }
+
+    select,
+    input {
+      min-height: 42px;
+      padding: 8px 10px;
+    }
+
+    select option {
+      color: #07143a;
+    }
+
+    textarea {
+      min-height: 260px;
+      resize: vertical;
+      padding: 12px;
+      line-height: 1.55;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 13px;
+    }
+
+    .transpose-card {
+      border: 1px solid rgba(40, 242, 238, .24);
+      border-radius: var(--radius);
+      padding: 16px;
+      background:
+        linear-gradient(145deg, rgba(40, 242, 238, .14), rgba(255,255,255,.04)),
+        rgba(255,255,255,.04);
+      box-shadow: 0 18px 45px rgba(0, 0, 0, .2);
+    }
+
+    .key-flow {
+      display: grid;
+      grid-template-columns: 1fr 54px 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .key-box {
+      min-height: 78px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, .08);
+    }
+
+    .key-box span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .key-box strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    .arrow {
+      min-height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: var(--cyan);
+      color: #06214a;
+      font-size: 32px;
+      font-weight: 900;
+      box-shadow: 0 0 26px rgba(40, 242, 238, .55);
+    }
+
+    .stepper,
+    .view-switch {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .view-switch {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    button.primary,
+    button.active {
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--cyan), var(--cyan-2));
+      color: #041733;
+      font-weight: 850;
+      box-shadow: 0 0 22px rgba(40, 242, 238, .32);
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .title-block {
+      min-width: 0;
+    }
+
+    .title-block h2 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 64px);
+      line-height: .98;
+      letter-spacing: 0;
+    }
+
+    .title-block p {
+      margin: 10px 0 0;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .sheet {
+      overflow: hidden;
+      border: 1px solid rgba(198, 222, 255, .22);
+      border-radius: 12px;
+      background: rgba(255,255,255,.07);
+      box-shadow: var(--shadow);
+    }
+
+    .section {
+      display: grid;
+      grid-template-columns: 138px minmax(0, 1fr);
+      border-top: 1px solid rgba(198, 222, 255, .16);
+    }
+
+    .section:first-child {
+      border-top: 0;
+    }
+
+    .section-name {
+      padding: 18px 16px;
+      color: #dce9ff;
+      font-weight: 900;
+      background: rgba(255, 255, 255, .06);
+      border-right: 1px solid rgba(198, 222, 255, .16);
+    }
+
+    .bars {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      background: rgba(255, 255, 255, .035);
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+      gap: 8px;
+    }
+
+    .bar {
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: var(--radius);
+      padding: 9px 10px;
+      background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(230,238,255,.95));
+      color: var(--ink);
+    }
+
+    .bar.repeat {
+      border-color: rgba(40, 242, 238, .55);
+      box-shadow: inset 0 0 0 1px rgba(40, 242, 238, .15);
+    }
+
+    .chord {
+      min-width: 0;
+      color: #0d2466;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
+    .plain {
+      margin: 0;
+      min-height: 540px;
+      padding: 22px;
+      color: var(--paper);
+      background: rgba(2, 7, 20, .72);
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 15px;
+      line-height: 1.85;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .status {
+      min-height: 20px;
+      margin-bottom: 10px;
+      color: var(--cyan);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        position: static;
+        height: auto;
+      }
+
+      main {
+        padding: 18px;
+      }
+
+      .toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .section {
+        grid-template-columns: 1fr;
+      }
+
+      .section-name {
+        border-right: 0;
+        border-bottom: 1px solid rgba(198, 222, 255, .16);
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+        color: #111;
+      }
+
+      body::before,
+      aside,
+      .toolbar,
+      .status {
+        display: none;
+      }
+
+      .app {
+        display: block;
+      }
+
+      main {
+        padding: 0;
+      }
+
+      .sheet {
+        border: 0;
+        box-shadow: none;
+      }
+
+      .section-name,
+      .bars {
+        background: white;
+        color: #111;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand">
+        <img src="icon.png" alt="Song Chord Book">
+        <div>
+          <h1>Song Chord Book</h1>
+          <div class="tagline">C to D. Any key, any chart.</div>
+        </div>
+      </div>
+
+      <div class="transpose-card">
+        <div class="key-flow">
+          <div class="key-box"><div><span>Original</span><strong>E</strong></div></div>
+          <div class="arrow">→</div>
+          <div class="key-box"><div><span>Now</span><strong id="nowKey">E</strong></div></div>
+        </div>
+        <div class="control">
+          <label for="targetKey">Key</label>
+          <select id="targetKey"></select>
+        </div>
+        <div class="stepper">
+          <button id="downBtn" title="半音下げる">-1</button>
+          <button id="resetBtn" class="primary" title="原曲キーに戻す">Reset</button>
+          <button id="upBtn" title="半音上げる">+1</button>
+        </div>
+      </div>
+
+      <div class="control">
+        <label>View</label>
+        <div class="view-switch">
+          <button id="chartBtn" class="active">Chart</button>
+          <button id="textBtn">Text</button>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="bpmInput">BPM</label>
+        <input id="bpmInput" type="number" min="20" max="260" value="122">
+      </div>
+
+      <div class="control">
+        <label for="sourceInput">Chart Source</label>
+        <textarea id="sourceInput" spellcheck="false"></textarea>
+      </div>
+
+      <button class="primary" id="applyBtn">Apply</button>
+    </aside>
+
+    <main>
+      <div class="toolbar">
+        <div class="title-block">
+          <h2>Blue Lagoon</h2>
+          <p id="metaLine">Key E / BPM 122</p>
+        </div>
+        <div class="actions">
+          <button id="copyBtn">Copy</button>
+          <button id="printBtn">Print</button>
+        </div>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="sheet">
+        <div id="chartView"></div>
+        <pre id="textView" class="plain hidden"></pre>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const originalKey = "E";
+    const sharpKeys = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const flatKeys = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+    const noteIndex = {
+      C: 0, "B#": 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, Fb: 4,
+      "E#": 5, F: 5, "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11, Cb: 11
+    };
+    const flatPreferred = new Set(["F", "Bb", "Eb", "Ab", "Db", "Gb", "Cb"]);
+
+    const defaultChart = `Intro:
+| Edim7 | E | Edim7 | E |
+| Edim7 | E | Edim7 | E |
+| Esus4 | E |
+
+A:
+| EM7(9) | G#m7 | C#m7 C#mM7 | C#m7 C#m6 |
+| AM7    | G#7  | C#m7       | F#m7(11) F#m7/B |
+
+B:
+| EM7(9) | F#m7 C#7 F#m7 F#m7/B |
+| EM7(9) | F#m7 C#7 F#m7 F#m7/B |
+| EM7(9) | F#m7 C#7 F#m7 F#m7/B |
+| EM7(9) | F#m7 C#7 F#m7 F#m7/B |
+
+C:
+| EM7 | F#m7 | EM7/G# | F#m7 |
+| EM7 | F#m7 | EM7/G# | F#m7/A |
+| F#m7(9)/B | F#m7(9)/B | F#m7(9)/B | F#m7(9)/B |
+
+Inter:
+| Edim7 | E | Edim7 | E |
+| Edim7 | E | Edim7 | E |
+| Esus4 | E |
+
+D Guitar Solo:
+A x 3
+
+Organ Solo:
+B
+
+C:
+| EM7 | F#m7 | EM7/G# | F#m7 |
+| EM7 | F#m7 | EM7/G# | F#m7/A |
+
+Perc Solo:
+| F#m7(9)/B | F#m7(9)/B | F#m7(9)/B | F#m7(9)/B |
+
+A
+B
+
+Ending:
+||: EM7(9) | F#m7 C#7 F#m7 F#m7/B |
+    EM7(9) | F#m7 C#7 F#m7 F#m7/B :|| fade out`;
+
+    const els = {
+      targetKey: document.querySelector("#targetKey"),
+      nowKey: document.querySelector("#nowKey"),
+      metaLine: document.querySelector("#metaLine"),
+      bpmInput: document.querySelector("#bpmInput"),
+      sourceInput: document.querySelector("#sourceInput"),
+      chartView: document.querySelector("#chartView"),
+      textView: document.querySelector("#textView"),
+      chartBtn: document.querySelector("#chartBtn"),
+      textBtn: document.querySelector("#textBtn"),
+      status: document.querySelector("#status")
+    };
+
+    let currentShift = 0;
+    let sourceChart = defaultChart;
+
+    function mod(value, by) {
+      return ((value % by) + by) % by;
+    }
+
+    function keyName(index, preferFlats) {
+      return (preferFlats ? flatKeys : sharpKeys)[mod(index, 12)];
+    }
+
+    function prefersFlatsForTarget(targetKey) {
+      return flatPreferred.has(targetKey);
+    }
+
+    function transposeRoot(root, shift, preferFlats) {
+      const index = noteIndex[root];
+      if (index === undefined) return root;
+      return keyName(index + shift, preferFlats);
+    }
+
+    function transposeChordToken(token, shift, preferFlats) {
+      return token.replace(/^([A-G](?:#|b)?)([^/\s|:]*)(?:\/([A-G](?:#|b)?))?$/, (_match, root, quality, bass) => {
+        const nextRoot = transposeRoot(root, shift, preferFlats);
+        const nextBass = bass ? "/" + transposeRoot(bass, shift, preferFlats) : "";
+        return nextRoot + quality + nextBass;
+      });
+    }
+
+    function transposeText(text, shift, preferFlats) {
+      return text.replace(/[A-G](?:#|b)?[^|\s:]*?(?:\/[A-G](?:#|b)?)?(?=\s|\||:|$)/g, token => {
+        if (!/[A-G]/.test(token) || /^(Intro|Inter|Ending|Organ|Guitar|Solo|Perc|fade|out)$/i.test(token)) {
+          return token;
+        }
+        return transposeChordToken(token, shift, preferFlats);
+      });
+    }
+
+    function parseSections(text) {
+      const sections = [];
+      let current = { name: "Chart", lines: [] };
+
+      text.split(/\r?\n/).forEach(raw => {
+        const line = raw.trimEnd();
+        const header = line.match(/^([^|]+):$/);
+        if (header) {
+          if (current.lines.length) sections.push(current);
+          current = { name: header[1].trim(), lines: [] };
+        } else if (line.trim() || current.lines.length) {
+          current.lines.push(line);
+        }
+      });
+
+      if (current.lines.length) sections.push(current);
+      return sections;
+    }
+
+    function renderChart(text) {
+      els.chartView.innerHTML = "";
+      parseSections(text).forEach(section => {
+        const wrap = document.createElement("section");
+        wrap.className = "section";
+
+        const name = document.createElement("div");
+        name.className = "section-name";
+        name.textContent = section.name;
+
+        const bars = document.createElement("div");
+        bars.className = "bars";
+
+        section.lines.forEach(line => {
+          if (!line.trim()) return;
+          if (!line.includes("|")) {
+            const row = document.createElement("div");
+            row.className = "bar-row";
+            const bar = document.createElement("div");
+            bar.className = "bar";
+            bar.textContent = line.trim();
+            row.appendChild(bar);
+            bars.appendChild(row);
+            return;
+          }
+
+          const row = document.createElement("div");
+          row.className = "bar-row";
+          line.split("|").map(part => part.trim()).filter(Boolean).forEach(part => {
+            const bar = document.createElement("div");
+            bar.className = part.includes(":") ? "bar repeat" : "bar";
+            part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean).forEach(chord => {
+              const span = document.createElement("span");
+              span.className = "chord";
+              span.textContent = chord;
+              bar.appendChild(span);
+            });
+            row.appendChild(bar);
+          });
+          bars.appendChild(row);
+        });
+
+        wrap.append(name, bars);
+        els.chartView.appendChild(wrap);
+      });
+    }
+
+    function update() {
+      const targetIndex = mod(noteIndex[originalKey] + currentShift, 12);
+      const targetKey = keyName(targetIndex, prefersFlatsForTarget(els.targetKey.value));
+      const preferFlats = prefersFlatsForTarget(targetKey);
+      const output = transposeText(sourceChart, currentShift, preferFlats);
+
+      els.targetKey.value = targetKey;
+      els.nowKey.textContent = targetKey;
+      els.metaLine.textContent = `Key ${targetKey} / BPM ${els.bpmInput.value || "122"}`;
+      els.textView.textContent = output;
+      renderChart(output);
+    }
+
+    function setTargetKey(key) {
+      currentShift = mod(noteIndex[key] - noteIndex[originalKey], 12);
+      update();
+    }
+
+    sharpKeys.forEach(key => {
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = key;
+      els.targetKey.appendChild(option);
+    });
+    ["Bb", "Eb", "Ab", "Db", "Gb"].forEach(key => {
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = key;
+      els.targetKey.appendChild(option);
+    });
+
+    els.sourceInput.value = defaultChart;
+    els.targetKey.value = originalKey;
+
+    document.querySelector("#downBtn").addEventListener("click", () => {
+      currentShift -= 1;
+      update();
+    });
+    document.querySelector("#upBtn").addEventListener("click", () => {
+      currentShift += 1;
+      update();
+    });
+    document.querySelector("#resetBtn").addEventListener("click", () => {
+      currentShift = 0;
+      update();
+    });
+    els.targetKey.addEventListener("change", event => setTargetKey(event.target.value));
+    els.bpmInput.addEventListener("input", update);
+    document.querySelector("#applyBtn").addEventListener("click", () => {
+      sourceChart = els.sourceInput.value;
+      update();
+    });
+    els.chartBtn.addEventListener("click", () => {
+      els.chartBtn.classList.add("active");
+      els.textBtn.classList.remove("active");
+      els.chartView.classList.remove("hidden");
+      els.textView.classList.add("hidden");
+    });
+    els.textBtn.addEventListener("click", () => {
+      els.textBtn.classList.add("active");
+      els.chartBtn.classList.remove("active");
+      els.textView.classList.remove("hidden");
+      els.chartView.classList.add("hidden");
+    });
+    document.querySelector("#copyBtn").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(els.textView.textContent);
+      els.status.textContent = "Copied";
+      setTimeout(() => els.status.textContent = "", 1800);
+    });
+    document.querySelector("#printBtn").addEventListener("click", () => window.print());
+
+    update();
+  </script>
+</body>
+</html>
