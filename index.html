@@ -265,7 +265,7 @@
     }
 
     .view-switch {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
     }
 
     .source-actions {
@@ -354,6 +354,39 @@
       gap: 10px;
     }
 
+    .lyric-row {
+      display: block;
+      margin: 2px 0 4px;
+    }
+
+    .lyric-line,
+    .cue-line {
+      border-radius: var(--radius);
+      color: #eef5ff;
+      line-height: 1.7;
+    }
+
+    .lyric-line {
+      padding: 8px 4px 9px;
+      font-size: 18px;
+      font-weight: 650;
+      letter-spacing: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border-bottom: 1px solid rgba(198, 222, 255, .16);
+    }
+
+    .cue-line {
+      display: inline-flex;
+      width: auto;
+      padding: 5px 10px;
+      color: var(--cyan-2);
+      background: rgba(40, 242, 238, .1);
+      border: 1px solid rgba(40, 242, 238, .22);
+      font-size: 14px;
+      font-weight: 850;
+    }
+
     .bar {
       position: relative;
       min-height: 58px;
@@ -422,6 +455,21 @@
       overflow-wrap: anywhere;
     }
 
+    .lead-sheet {
+      margin: 0;
+      min-height: 540px;
+      padding: 22px;
+      color: #08143a;
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(235,242,255,.96));
+      font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 16px;
+      font-weight: 720;
+      line-height: 1.9;
+      white-space: pre;
+      overflow-x: auto;
+      tab-size: 4;
+    }
+
     .status {
       min-height: 20px;
       margin-bottom: 10px;
@@ -460,6 +508,36 @@
       .section-name {
         border-right: 0;
         border-bottom: 1px solid rgba(198, 222, 255, .16);
+      }
+
+      .bars {
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .bar-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .bar {
+        min-height: 52px;
+        padding: 9px 10px;
+      }
+
+      .chord {
+        font-size: 16px;
+      }
+
+      .lyric-line {
+        padding: 7px 2px 8px;
+        font-size: 17px;
+      }
+
+      .lead-sheet {
+        padding: 16px;
+        font-size: 14px;
+        line-height: 1.8;
       }
     }
 
@@ -532,7 +610,8 @@
       <div class="control">
         <label>View</label>
         <div class="view-switch">
-          <button id="chartBtn" class="active">Chart</button>
+          <button id="sheetBtn" class="active">Sheet</button>
+          <button id="chartBtn">Cards</button>
           <button id="textBtn">Text</button>
         </div>
       </div>
@@ -587,7 +666,8 @@
       </div>
       <div class="status" id="status"></div>
       <div class="sheet">
-        <div id="chartView"></div>
+        <pre id="sheetView" class="lead-sheet"></pre>
+        <div id="chartView" class="hidden"></div>
         <pre id="textView" class="plain hidden"></pre>
       </div>
     </main>
@@ -662,8 +742,10 @@ Ending:
       measureCount: document.querySelector("#measureCount"),
       beatCount: document.querySelector("#beatCount"),
       sourceInput: document.querySelector("#sourceInput"),
+      sheetView: document.querySelector("#sheetView"),
       chartView: document.querySelector("#chartView"),
       textView: document.querySelector("#textView"),
+      sheetBtn: document.querySelector("#sheetBtn"),
       chartBtn: document.querySelector("#chartBtn"),
       textBtn: document.querySelector("#textBtn"),
       status: document.querySelector("#status")
@@ -754,6 +836,62 @@ Ending:
       return Number.parseInt(els.meterInput.value, 10) || 4;
     }
 
+    function isChordToken(token) {
+      return /^([A-G](?:#|b)?)([^/\s|:]*)?(?:\/([A-G](?:#|b)?))?$/.test(token);
+    }
+
+    function isChordOnlyLine(line) {
+      const tokens = line
+        .replace(/:\|\||\|\|:|:|\|\||[,，]/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      return tokens.length > 0 && tokens.every(isChordToken);
+    }
+
+    function isCueLine(line) {
+      const trimmed = line.trim();
+      const first = trimmed[0];
+      const last = trimmed[trimmed.length - 1];
+      const bracketed = (first === "[" && last === "]") || (first === "(" && last === ")");
+      return bracketed || /^(Intro|Inter|Verse|A|B|C|D|Bridge|Chorus|Ending|Solo|Hook|Pre|Outro)\b/i.test(trimmed);
+    }
+
+    function renderPlainLine(line, bars) {
+      const row = document.createElement("div");
+      row.className = "lyric-row";
+      const text = document.createElement("div");
+      text.className = isCueLine(line) ? "cue-line" : "lyric-line";
+      text.textContent = line.trim();
+      row.appendChild(text);
+      bars.appendChild(row);
+    }
+
+    function renderBarFromChords(part, row, beatsPerMeasure, measureNumber) {
+      const bar = document.createElement("div");
+      bar.className = part.includes(":") ? "bar repeat" : "bar";
+      const number = document.createElement("span");
+      number.className = "bar-number";
+      number.textContent = measureNumber;
+      bar.appendChild(number);
+
+      const chords = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
+      const beatStep = chords.length ? beatsPerMeasure / chords.length : beatsPerMeasure;
+      chords.forEach((chord, index) => {
+        const chip = document.createElement("span");
+        chip.className = "chord-chip";
+        const beat = document.createElement("span");
+        beat.className = "beat-mark";
+        beat.textContent = formatBeat(1 + index * beatStep);
+        const span = document.createElement("span");
+        span.className = "chord";
+        span.textContent = chord;
+        chip.append(beat, span);
+        bar.appendChild(chip);
+      });
+      row.appendChild(bar);
+    }
+
     function renderChart(text) {
       els.chartView.innerHTML = "";
       let measureCounter = 0;
@@ -772,44 +910,38 @@ Ending:
         section.lines.forEach(line => {
           if (!line.trim()) return;
           if (!line.includes("|")) {
-            const row = document.createElement("div");
-            row.className = "bar-row";
-            const bar = document.createElement("div");
-            bar.className = "bar";
-            bar.textContent = line.trim();
-            row.appendChild(bar);
-            bars.appendChild(row);
+            if (isChordOnlyLine(line)) {
+              const row = document.createElement("div");
+              row.className = "bar-row";
+              measureCounter += 1;
+              renderBarFromChords(line.trim(), row, beatsPerMeasure, measureCounter);
+              bars.appendChild(row);
+              return;
+            }
+
+            renderPlainLine(line, bars);
+            return;
+          }
+
+          const parts = line.split("|").map(part => part.trim()).filter(Boolean);
+          if (!parts.some(isChordOnlyLine)) {
+            renderPlainLine(line, bars);
             return;
           }
 
           const row = document.createElement("div");
           row.className = "bar-row";
-          line.split("|").map(part => part.trim()).filter(Boolean).forEach(part => {
-            const bar = document.createElement("div");
-            bar.className = part.includes(":") ? "bar repeat" : "bar";
+          parts.forEach(part => {
+            if (!isChordOnlyLine(part)) {
+              renderPlainLine(part, bars);
+              return;
+            }
             measureCounter += 1;
-            const number = document.createElement("span");
-            number.className = "bar-number";
-            number.textContent = measureCounter;
-            bar.appendChild(number);
-
-            const chords = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
-            const beatStep = chords.length ? beatsPerMeasure / chords.length : beatsPerMeasure;
-            chords.forEach((chord, index) => {
-              const chip = document.createElement("span");
-              chip.className = "chord-chip";
-              const beat = document.createElement("span");
-              beat.className = "beat-mark";
-              beat.textContent = formatBeat(1 + index * beatStep);
-              const span = document.createElement("span");
-              span.className = "chord";
-              span.textContent = chord;
-              chip.append(beat, span);
-              bar.appendChild(chip);
-            });
-            row.appendChild(bar);
+            renderBarFromChords(part, row, beatsPerMeasure, measureCounter);
           });
-          bars.appendChild(row);
+          if (row.children.length) {
+            bars.appendChild(row);
+          }
         });
 
         wrap.append(name, bars);
@@ -831,6 +963,7 @@ Ending:
       els.nowKey.textContent = targetKey;
       els.songTitle.textContent = els.titleInput.value || "Untitled";
       els.metaLine.textContent = `Key ${targetKey} / BPM ${els.bpmInput.value || "122"} / ${els.meterInput.selectedOptions[0].textContent}`;
+      els.sheetView.textContent = output;
       els.textView.textContent = output;
       renderChart(output);
       saveState();
@@ -911,18 +1044,18 @@ Ending:
       els.status.textContent = "Sample restored";
       setTimeout(() => els.status.textContent = "", 1800);
     });
-    els.chartBtn.addEventListener("click", () => {
-      els.chartBtn.classList.add("active");
-      els.textBtn.classList.remove("active");
-      els.chartView.classList.remove("hidden");
-      els.textView.classList.add("hidden");
-    });
-    els.textBtn.addEventListener("click", () => {
-      els.textBtn.classList.add("active");
-      els.chartBtn.classList.remove("active");
-      els.textView.classList.remove("hidden");
-      els.chartView.classList.add("hidden");
-    });
+    function setView(view) {
+      els.sheetBtn.classList.toggle("active", view === "sheet");
+      els.chartBtn.classList.toggle("active", view === "chart");
+      els.textBtn.classList.toggle("active", view === "text");
+      els.sheetView.classList.toggle("hidden", view !== "sheet");
+      els.chartView.classList.toggle("hidden", view !== "chart");
+      els.textView.classList.toggle("hidden", view !== "text");
+    }
+
+    els.sheetBtn.addEventListener("click", () => setView("sheet"));
+    els.chartBtn.addEventListener("click", () => setView("chart"));
+    els.textBtn.addEventListener("click", () => setView("text"));
     document.querySelector("#copyBtn").addEventListener("click", async () => {
       await navigator.clipboard.writeText(els.textView.textContent);
       els.status.textContent = "Copied";
