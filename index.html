@@ -470,6 +470,40 @@
       tab-size: 4;
     }
 
+    .sheet-line {
+      min-height: 1.9em;
+    }
+
+    .sheet-section {
+      display: inline-block;
+      margin-top: 10px;
+      color: #052a70;
+      font-weight: 950;
+    }
+
+    .sheet-cue {
+      color: #1477b8;
+      font-weight: 850;
+    }
+
+    .sheet-lyric {
+      color: #243a68;
+      font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+      font-weight: 650;
+      white-space: pre-wrap;
+    }
+
+    .sheet-chord {
+      color: #007c89;
+      font-weight: 950;
+      text-shadow: 0 0 16px rgba(40, 242, 238, .18);
+    }
+
+    .sheet-barline {
+      color: rgba(8, 20, 58, .42);
+      font-weight: 800;
+    }
+
     .status {
       min-height: 20px;
       margin-bottom: 10px;
@@ -892,6 +926,68 @@ Ending:
       row.appendChild(bar);
     }
 
+    function appendSheetToken(lineEl, token) {
+      const span = document.createElement("span");
+      if (/^\|+$|^:\|\|$|^\|\|:$|^:?\|\|:?$/.test(token)) {
+        span.className = "sheet-barline";
+      } else if (isChordToken(token.replace(/:$/, ""))) {
+        span.className = "sheet-chord";
+      } else {
+        span.className = "sheet-lyric";
+      }
+      span.textContent = token;
+      lineEl.appendChild(span);
+    }
+
+    function renderSheet(text) {
+      els.sheetView.innerHTML = "";
+      text.split(/\r?\n/).forEach(line => {
+        const lineEl = document.createElement("div");
+        lineEl.className = "sheet-line";
+
+        if (!line.trim()) {
+          lineEl.textContent = " ";
+          els.sheetView.appendChild(lineEl);
+          return;
+        }
+
+        if (/^[^|]+:\s*$/.test(line.trim())) {
+          const span = document.createElement("span");
+          span.className = "sheet-section";
+          span.textContent = line.trim();
+          lineEl.appendChild(span);
+          els.sheetView.appendChild(lineEl);
+          return;
+        }
+
+        if (isCueLine(line)) {
+          const span = document.createElement("span");
+          span.className = "sheet-cue";
+          span.textContent = line;
+          lineEl.appendChild(span);
+          els.sheetView.appendChild(lineEl);
+          return;
+        }
+
+        if (line.includes("|") || isChordOnlyLine(line)) {
+          line.split(/(\s+|\|\|:|:\|\||\||:)/).filter(part => part !== "").forEach(part => {
+            if (/^\s+$/.test(part)) {
+              lineEl.appendChild(document.createTextNode(part));
+            } else {
+              appendSheetToken(lineEl, part);
+            }
+          });
+        } else {
+          const span = document.createElement("span");
+          span.className = "sheet-lyric";
+          span.textContent = line;
+          lineEl.appendChild(span);
+        }
+
+        els.sheetView.appendChild(lineEl);
+      });
+    }
+
     function renderChart(text) {
       els.chartView.innerHTML = "";
       let measureCounter = 0;
@@ -963,7 +1059,7 @@ Ending:
       els.nowKey.textContent = targetKey;
       els.songTitle.textContent = els.titleInput.value || "Untitled";
       els.metaLine.textContent = `Key ${targetKey} / BPM ${els.bpmInput.value || "122"} / ${els.meterInput.selectedOptions[0].textContent}`;
-      els.sheetView.textContent = output;
+      renderSheet(output);
       els.textView.textContent = output;
       renderChart(output);
       saveState();
