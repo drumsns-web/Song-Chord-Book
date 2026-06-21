@@ -188,6 +188,38 @@
       margin-bottom: 14px;
     }
 
+    .song-stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .song-stat {
+      min-height: 64px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, .07);
+      text-align: center;
+    }
+
+    .song-stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .song-stat strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 24px;
+      line-height: 1;
+    }
+
     .key-box {
       min-height: 78px;
       display: grid;
@@ -234,6 +266,13 @@
 
     .view-switch {
       grid-template-columns: repeat(2, 1fr);
+    }
+
+    .source-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
     }
 
     button.primary,
@@ -311,21 +350,34 @@
 
     .bar-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+      gap: 10px;
     }
 
     .bar {
-      min-height: 50px;
+      position: relative;
+      min-height: 58px;
       display: flex;
       align-items: center;
-      gap: 8px;
-      overflow: hidden;
+      align-content: center;
+      flex-wrap: wrap;
+      gap: 7px 12px;
+      overflow: visible;
       border: 1px solid rgba(255, 255, 255, .18);
       border-radius: var(--radius);
-      padding: 9px 10px;
+      padding: 11px 12px;
       background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(230,238,255,.95));
       color: var(--ink);
+    }
+
+    .bar-number {
+      position: absolute;
+      top: 5px;
+      right: 7px;
+      color: rgba(13, 36, 102, .46);
+      font-size: 10px;
+      font-weight: 900;
+      line-height: 1;
     }
 
     .bar.repeat {
@@ -334,12 +386,27 @@
     }
 
     .chord {
-      min-width: 0;
+      display: inline-flex;
+      min-width: max-content;
       color: #0d2466;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 900;
-      line-height: 1.1;
+      line-height: 1.18;
       white-space: nowrap;
+    }
+
+    .chord-chip {
+      display: inline-grid;
+      gap: 2px;
+      min-width: max-content;
+      padding-top: 8px;
+    }
+
+    .beat-mark {
+      color: rgba(13, 36, 102, .52);
+      font-size: 10px;
+      font-weight: 900;
+      line-height: 1;
     }
 
     .plain {
@@ -443,13 +510,17 @@
 
       <div class="transpose-card">
         <div class="key-flow">
-          <div class="key-box"><div><span>Original</span><strong>E</strong></div></div>
+          <div class="key-box"><div><span>Original</span><strong id="originalKeyRead">E</strong></div></div>
           <div class="arrow">→</div>
           <div class="key-box"><div><span>Now</span><strong id="nowKey">E</strong></div></div>
         </div>
         <div class="control">
           <label for="targetKey">Key</label>
           <select id="targetKey"></select>
+        </div>
+        <div class="control">
+          <label for="originalKeyInput">Original Key</label>
+          <select id="originalKeyInput"></select>
         </div>
         <div class="stepper">
           <button id="downBtn" title="半音下げる">-1</button>
@@ -472,8 +543,32 @@
       </div>
 
       <div class="control">
+        <label for="meterInput">Meter</label>
+        <select id="meterInput">
+          <option value="4">4/4</option>
+          <option value="3">3/4</option>
+          <option value="6">6/8</option>
+          <option value="5">5/4</option>
+        </select>
+      </div>
+
+      <div class="song-stats">
+        <div class="song-stat"><div><span>Measures</span><strong id="measureCount">0</strong></div></div>
+        <div class="song-stat"><div><span>Beats</span><strong id="beatCount">0</strong></div></div>
+      </div>
+
+      <div class="control">
+        <label for="titleInput">Song Title</label>
+        <input id="titleInput" type="text" value="Blue Lagoon">
+      </div>
+
+      <div class="control">
         <label for="sourceInput">Chart Source</label>
         <textarea id="sourceInput" spellcheck="false"></textarea>
+        <div class="source-actions">
+          <button id="clearSourceBtn" type="button">Clear</button>
+          <button id="sampleSourceBtn" type="button">Sample</button>
+        </div>
       </div>
 
       <button class="primary" id="applyBtn">Apply</button>
@@ -482,7 +577,7 @@
     <main>
       <div class="toolbar">
         <div class="title-block">
-          <h2>Blue Lagoon</h2>
+          <h2 id="songTitle">Blue Lagoon</h2>
           <p id="metaLine">Key E / BPM 122</p>
         </div>
         <div class="actions">
@@ -499,7 +594,8 @@
   </div>
 
   <script>
-    const originalKey = "E";
+    const storageKey = "song-chord-book-state-v1";
+    let originalKey = "E";
     const sharpKeys = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     const flatKeys = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
     const noteIndex = {
@@ -555,9 +651,16 @@ Ending:
 
     const els = {
       targetKey: document.querySelector("#targetKey"),
+      originalKeyInput: document.querySelector("#originalKeyInput"),
+      originalKeyRead: document.querySelector("#originalKeyRead"),
       nowKey: document.querySelector("#nowKey"),
+      songTitle: document.querySelector("#songTitle"),
+      titleInput: document.querySelector("#titleInput"),
       metaLine: document.querySelector("#metaLine"),
       bpmInput: document.querySelector("#bpmInput"),
+      meterInput: document.querySelector("#meterInput"),
+      measureCount: document.querySelector("#measureCount"),
+      beatCount: document.querySelector("#beatCount"),
       sourceInput: document.querySelector("#sourceInput"),
       chartView: document.querySelector("#chartView"),
       textView: document.querySelector("#textView"),
@@ -568,6 +671,26 @@ Ending:
 
     let currentShift = 0;
     let sourceChart = defaultChart;
+
+    function saveState() {
+      const state = {
+        title: els.titleInput.value,
+        originalKey,
+        targetKey: els.targetKey.value,
+        bpm: els.bpmInput.value,
+        meter: els.meterInput.value,
+        chart: els.sourceInput.value
+      };
+      localStorage.setItem(storageKey, JSON.stringify(state));
+    }
+
+    function loadState() {
+      try {
+        return JSON.parse(localStorage.getItem(storageKey) || "null");
+      } catch {
+        return null;
+      }
+    }
 
     function mod(value, by) {
       return ((value % by) + by) % by;
@@ -623,8 +746,18 @@ Ending:
       return sections;
     }
 
+    function formatBeat(value) {
+      return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+    }
+
+    function currentBeatsPerMeasure() {
+      return Number.parseInt(els.meterInput.value, 10) || 4;
+    }
+
     function renderChart(text) {
       els.chartView.innerHTML = "";
+      let measureCounter = 0;
+      const beatsPerMeasure = currentBeatsPerMeasure();
       parseSections(text).forEach(section => {
         const wrap = document.createElement("section");
         wrap.className = "section";
@@ -654,11 +787,25 @@ Ending:
           line.split("|").map(part => part.trim()).filter(Boolean).forEach(part => {
             const bar = document.createElement("div");
             bar.className = part.includes(":") ? "bar repeat" : "bar";
-            part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean).forEach(chord => {
+            measureCounter += 1;
+            const number = document.createElement("span");
+            number.className = "bar-number";
+            number.textContent = measureCounter;
+            bar.appendChild(number);
+
+            const chords = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
+            const beatStep = chords.length ? beatsPerMeasure / chords.length : beatsPerMeasure;
+            chords.forEach((chord, index) => {
+              const chip = document.createElement("span");
+              chip.className = "chord-chip";
+              const beat = document.createElement("span");
+              beat.className = "beat-mark";
+              beat.textContent = formatBeat(1 + index * beatStep);
               const span = document.createElement("span");
               span.className = "chord";
               span.textContent = chord;
-              bar.appendChild(span);
+              chip.append(beat, span);
+              bar.appendChild(chip);
             });
             row.appendChild(bar);
           });
@@ -668,6 +815,8 @@ Ending:
         wrap.append(name, bars);
         els.chartView.appendChild(wrap);
       });
+      els.measureCount.textContent = measureCounter;
+      els.beatCount.textContent = measureCounter * beatsPerMeasure;
     }
 
     function update() {
@@ -677,10 +826,14 @@ Ending:
       const output = transposeText(sourceChart, currentShift, preferFlats);
 
       els.targetKey.value = targetKey;
+      els.originalKeyInput.value = originalKey;
+      els.originalKeyRead.textContent = originalKey;
       els.nowKey.textContent = targetKey;
-      els.metaLine.textContent = `Key ${targetKey} / BPM ${els.bpmInput.value || "122"}`;
+      els.songTitle.textContent = els.titleInput.value || "Untitled";
+      els.metaLine.textContent = `Key ${targetKey} / BPM ${els.bpmInput.value || "122"} / ${els.meterInput.selectedOptions[0].textContent}`;
       els.textView.textContent = output;
       renderChart(output);
+      saveState();
     }
 
     function setTargetKey(key) {
@@ -688,21 +841,34 @@ Ending:
       update();
     }
 
-    sharpKeys.forEach(key => {
-      const option = document.createElement("option");
-      option.value = key;
-      option.textContent = key;
-      els.targetKey.appendChild(option);
-    });
-    ["Bb", "Eb", "Ab", "Db", "Gb"].forEach(key => {
-      const option = document.createElement("option");
-      option.value = key;
-      option.textContent = key;
-      els.targetKey.appendChild(option);
-    });
+    function fillKeySelect(select) {
+      [...sharpKeys, "Bb", "Eb", "Ab", "Db", "Gb"].forEach(key => {
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = key;
+        select.appendChild(option);
+      });
+    }
+
+    fillKeySelect(els.targetKey);
+    fillKeySelect(els.originalKeyInput);
 
     els.sourceInput.value = defaultChart;
     els.targetKey.value = originalKey;
+    els.originalKeyInput.value = originalKey;
+
+    const saved = loadState();
+    if (saved) {
+      originalKey = noteIndex[saved.originalKey] !== undefined ? saved.originalKey : originalKey;
+      els.titleInput.value = saved.title || "Blue Lagoon";
+      els.bpmInput.value = saved.bpm || "122";
+      els.meterInput.value = saved.meter || "4";
+      sourceChart = saved.chart || defaultChart;
+      els.sourceInput.value = sourceChart;
+      currentShift = saved.targetKey && noteIndex[saved.targetKey] !== undefined
+        ? mod(noteIndex[saved.targetKey] - noteIndex[originalKey], 12)
+        : 0;
+    }
 
     document.querySelector("#downBtn").addEventListener("click", () => {
       currentShift -= 1;
@@ -717,10 +883,33 @@ Ending:
       update();
     });
     els.targetKey.addEventListener("change", event => setTargetKey(event.target.value));
+    els.originalKeyInput.addEventListener("change", event => {
+      const currentTarget = els.targetKey.value;
+      originalKey = event.target.value;
+      currentShift = mod(noteIndex[currentTarget] - noteIndex[originalKey], 12);
+      update();
+    });
+    els.titleInput.addEventListener("input", update);
     els.bpmInput.addEventListener("input", update);
+    els.meterInput.addEventListener("change", update);
     document.querySelector("#applyBtn").addEventListener("click", () => {
       sourceChart = els.sourceInput.value;
       update();
+    });
+    document.querySelector("#clearSourceBtn").addEventListener("click", () => {
+      if (!confirm("コード譜本文をクリアしますか？")) return;
+      els.sourceInput.value = "";
+      sourceChart = "";
+      update();
+      els.status.textContent = "Chart source cleared";
+      setTimeout(() => els.status.textContent = "", 1800);
+    });
+    document.querySelector("#sampleSourceBtn").addEventListener("click", () => {
+      els.sourceInput.value = defaultChart;
+      sourceChart = defaultChart;
+      update();
+      els.status.textContent = "Sample restored";
+      setTimeout(() => els.status.textContent = "", 1800);
     });
     els.chartBtn.addEventListener("click", () => {
       els.chartBtn.classList.add("active");
