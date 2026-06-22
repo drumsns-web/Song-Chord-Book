@@ -275,6 +275,38 @@
       margin-top: 8px;
     }
 
+    .builder {
+      border: 1px solid rgba(40, 242, 238, .2);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: rgba(255, 255, 255, .05);
+    }
+
+    .builder-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .builder-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .builder-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .builder-actions button,
+    .builder-row button {
+      padding-inline: 10px;
+      white-space: nowrap;
+    }
+
     button.primary,
     button.active {
       border-color: transparent;
@@ -675,6 +707,29 @@
         <input id="titleInput" type="text" value="Blue Lagoon">
       </div>
 
+      <div class="control builder">
+        <label>Template Builder</label>
+        <div class="builder-grid">
+          <div class="builder-row">
+            <input id="sectionBuilderInput" type="text" placeholder="Intro / A / サビ">
+            <button id="addSectionBtn" type="button">Section</button>
+          </div>
+          <div class="builder-row">
+            <input id="barBuilderInput" type="text" placeholder="Edim7 E Edim7 E">
+            <button id="addBarBtn" type="button">Bar</button>
+          </div>
+          <div class="builder-row">
+            <input id="lyricBuilderInput" type="text" placeholder="歌詞を入力">
+            <button id="addLyricBtn" type="button">Lyric</button>
+          </div>
+        </div>
+        <div class="builder-actions">
+          <button id="addBlankBtn" type="button">Blank</button>
+          <button id="addRepeatBtn" type="button">Repeat</button>
+          <button id="addStarterBtn" type="button">Starter</button>
+        </div>
+      </div>
+
       <div class="control">
         <label for="sourceInput">Chart Source</label>
         <textarea id="sourceInput" spellcheck="false"></textarea>
@@ -775,6 +830,9 @@ Ending:
       meterInput: document.querySelector("#meterInput"),
       measureCount: document.querySelector("#measureCount"),
       beatCount: document.querySelector("#beatCount"),
+      sectionBuilderInput: document.querySelector("#sectionBuilderInput"),
+      barBuilderInput: document.querySelector("#barBuilderInput"),
+      lyricBuilderInput: document.querySelector("#lyricBuilderInput"),
       sourceInput: document.querySelector("#sourceInput"),
       sheetView: document.querySelector("#sheetView"),
       chartView: document.querySelector("#chartView"),
@@ -1070,6 +1128,36 @@ Ending:
       update();
     }
 
+    function applySourceEdit() {
+      sourceChart = els.sourceInput.value;
+      update();
+    }
+
+    function insertIntoSource(text) {
+      const input = els.sourceInput;
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? input.value.length;
+      const before = input.value.slice(0, start);
+      const after = input.value.slice(end);
+      const needsBeforeBreak = before && !before.endsWith("\n");
+      const needsAfterBreak = after && !text.endsWith("\n");
+      const insertion = `${needsBeforeBreak ? "\n" : ""}${text}${needsAfterBreak ? "\n" : ""}`;
+      input.value = before + insertion + after;
+      const cursor = before.length + insertion.length;
+      input.focus();
+      input.setSelectionRange(cursor, cursor);
+      applySourceEdit();
+    }
+
+    function normalizeBarInput(value) {
+      const trimmed = value.trim();
+      if (!trimmed) return "| C | F | G | C |\n";
+      if (trimmed.includes("|")) {
+        return `${trimmed}\n`;
+      }
+      return `| ${trimmed} |\n`;
+    }
+
     function fillKeySelect(select) {
       [...sharpKeys, "Bb", "Eb", "Ab", "Db", "Gb"].forEach(key => {
         const option = document.createElement("option");
@@ -1122,8 +1210,30 @@ Ending:
     els.bpmInput.addEventListener("input", update);
     els.meterInput.addEventListener("change", update);
     document.querySelector("#applyBtn").addEventListener("click", () => {
-      sourceChart = els.sourceInput.value;
-      update();
+      applySourceEdit();
+    });
+    document.querySelector("#addSectionBtn").addEventListener("click", () => {
+      const name = els.sectionBuilderInput.value.trim() || "Section";
+      insertIntoSource(`${name}:\n`);
+      els.sectionBuilderInput.value = "";
+    });
+    document.querySelector("#addBarBtn").addEventListener("click", () => {
+      insertIntoSource(normalizeBarInput(els.barBuilderInput.value));
+      els.barBuilderInput.value = "";
+    });
+    document.querySelector("#addLyricBtn").addEventListener("click", () => {
+      const lyric = els.lyricBuilderInput.value.trim() || "ここに歌詞";
+      insertIntoSource(`${lyric}\n`);
+      els.lyricBuilderInput.value = "";
+    });
+    document.querySelector("#addBlankBtn").addEventListener("click", () => {
+      insertIntoSource("\n");
+    });
+    document.querySelector("#addRepeatBtn").addEventListener("click", () => {
+      insertIntoSource("||: C | F | G | C :||\n");
+    });
+    document.querySelector("#addStarterBtn").addEventListener("click", () => {
+      insertIntoSource("Intro:\n| C | F | G | C |\n\nA:\n| C | G/B | Am | F |\nここに歌詞\n| C | G | F | C |\n\n");
     });
     document.querySelector("#clearSourceBtn").addEventListener("click", () => {
       if (!confirm("コード譜本文をクリアしますか？")) return;
