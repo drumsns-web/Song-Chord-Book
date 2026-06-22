@@ -301,7 +301,7 @@
 
     .builder-actions {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 8px;
       margin-top: 8px;
     }
@@ -744,37 +744,37 @@
         <img src="icon.png" alt="Song Chord Book">
         <div>
           <h1>Song Chord Book</h1>
-          <div class="tagline">C to D. Any key, any chart.</div>
+          <div class="tagline">どの曲も、好きなキーへ。</div>
         </div>
       </div>
 
       <div class="transpose-card">
         <div class="key-flow">
-          <div class="key-box"><div><span>Original</span><strong id="originalKeyRead">E</strong></div></div>
+          <div class="key-box"><div><span>原曲キー</span><strong id="originalKeyRead">E</strong></div></div>
           <div class="arrow">→</div>
-          <div class="key-box"><div><span>Now</span><strong id="nowKey">E</strong></div></div>
+          <div class="key-box"><div><span>現在</span><strong id="nowKey">E</strong></div></div>
         </div>
         <div class="control">
-          <label for="targetKey">Key</label>
+          <label for="targetKey">移調先キー</label>
           <select id="targetKey"></select>
         </div>
         <div class="control">
-          <label for="originalKeyInput">Original Key</label>
+          <label for="originalKeyInput">原曲キー</label>
           <select id="originalKeyInput"></select>
         </div>
         <div class="stepper">
           <button id="downBtn" title="半音下げる">-1</button>
-          <button id="resetBtn" class="primary" title="原曲キーに戻す">Reset</button>
+          <button id="resetBtn" class="primary" title="原曲キーに戻す">リセット</button>
           <button id="upBtn" title="半音上げる">+1</button>
         </div>
       </div>
 
       <div class="control">
-        <label>View</label>
+        <label>表示</label>
         <div class="view-switch">
-          <button id="sheetBtn" class="active">Sheet</button>
-          <button id="chartBtn">Cards</button>
-          <button id="textBtn">Text</button>
+          <button id="sheetBtn" class="active">譜面</button>
+          <button id="chartBtn">カード</button>
+          <button id="textBtn">テキスト</button>
         </div>
       </div>
 
@@ -784,7 +784,7 @@
       </div>
 
       <div class="control">
-        <label for="meterInput">Meter</label>
+        <label for="meterInput">拍子</label>
         <select id="meterInput">
           <option value="4">4/4</option>
           <option value="3">3/4</option>
@@ -794,60 +794,61 @@
       </div>
 
       <div class="song-stats">
-        <div class="song-stat"><div><span>Measures</span><strong id="measureCount">0</strong></div></div>
-        <div class="song-stat"><div><span>Beats</span><strong id="beatCount">0</strong></div></div>
+        <div class="song-stat"><div><span>小節数</span><strong id="measureCount">0</strong></div></div>
+        <div class="song-stat"><div><span>拍数</span><strong id="beatCount">0</strong></div></div>
       </div>
 
       <div class="control">
-        <label for="titleInput">Song Title</label>
+        <label for="titleInput">曲名</label>
         <input id="titleInput" type="text" value="Blue Lagoon">
       </div>
 
       <div class="control color-settings">
-        <label>Color Settings</label>
+        <label>色設定</label>
         <div class="color-grid">
           <div class="color-field">
-            <span>Chord</span>
+            <span>コード</span>
             <input id="chordColorInput" type="color" value="#007c89">
           </div>
           <div class="color-field">
-            <span>Lyrics</span>
+            <span>歌詞</span>
             <input id="lyricColorInput" type="color" value="#243a68">
           </div>
           <div class="color-field">
-            <span>Section</span>
+            <span>見出し</span>
             <input id="sectionColorInput" type="color" value="#052a70">
           </div>
           <div class="color-field">
-            <span>Rhythm</span>
+            <span>記号</span>
             <input id="rhythmColorInput" type="color" value="#d8662a">
           </div>
         </div>
         <div class="source-actions">
-          <button id="resetColorsBtn" type="button">Reset Colors</button>
+          <button id="resetColorsBtn" type="button">色を戻す</button>
         </div>
       </div>
 
       <div class="control builder">
-        <label>Template Builder</label>
+        <label>入力補助</label>
         <div class="builder-grid">
           <div class="builder-row">
             <input id="sectionBuilderInput" type="text" placeholder="Intro / A / サビ">
-            <button id="addSectionBtn" type="button">Section</button>
+            <button id="addSectionBtn" type="button">見出し</button>
           </div>
           <div class="builder-row">
             <input id="barBuilderInput" type="text" placeholder="Edim7 E Edim7 E">
-            <button id="addBarBtn" type="button">Bar</button>
+            <button id="addBarBtn" type="button">小節</button>
           </div>
           <div class="builder-row">
             <input id="lyricBuilderInput" type="text" placeholder="歌詞を入力">
-            <button id="addLyricBtn" type="button">Lyric</button>
+            <button id="addLyricBtn" type="button">歌詞</button>
           </div>
         </div>
         <div class="builder-actions">
-          <button id="toggleChordPickerBtn" type="button">Chords</button>
-          <button id="addRepeatBtn" type="button">Repeat</button>
-          <button id="addStarterBtn" type="button">Starter</button>
+          <button id="toggleChordPickerBtn" type="button">コード</button>
+          <button id="addBlankBtn" type="button">改行</button>
+          <button id="addRepeatBtn" type="button">繰返し</button>
+          <button id="addStarterBtn" type="button">ひな形</button>
         </div>
         <div id="chordPicker" class="picker-panel">
           <div class="picker-controls">
@@ -857,30 +858,31 @@
           </div>
           <div class="picker-preview">
             <span id="chordPreview">C</span>
-            <button id="insertPickedChordBtn" type="button">Insert</button>
+            <button id="insertPickedChordBtn" type="button">入力</button>
           </div>
           <div id="commonChordButtons" class="picker-buttons"></div>
           <div class="rhythm-buttons">
-            <button class="rhythmBtn" data-symbol=">">Accent</button>
-            <button class="rhythmBtn" data-symbol="^">Sync</button>
-            <button class="rhythmBtn" data-symbol="-">Hold</button>
-            <button id="addBlankBtn" type="button">Blank</button>
+            <button class="rhythmBtn" data-symbol=">">アクセント</button>
+            <button class="rhythmBtn" data-symbol="^">食う</button>
+            <button class="rhythmBtn" data-symbol="-">伸ばし</button>
+            <button class="rhythmBtn" data-symbol="~">タイ</button>
           </div>
         </div>
       </div>
 
       <div class="control">
-        <label for="sourceInput">Chart Source</label>
+        <label for="sourceInput">コード譜入力</label>
         <textarea id="sourceInput" spellcheck="false"></textarea>
         <div class="source-actions">
-          <button id="clearSourceBtn" type="button">Clear</button>
-          <button id="sampleSourceBtn" type="button">Sample</button>
-          <button id="pasteSourceBtn" type="button">Paste</button>
-          <button id="copySourceBtn" type="button">Copy</button>
+          <button id="undoSourceBtn" type="button">アンドゥ</button>
+          <button id="clearSourceBtn" type="button">クリア</button>
+          <button id="sampleSourceBtn" type="button">サンプル</button>
+          <button id="pasteSourceBtn" type="button">貼り付け</button>
+          <button id="copySourceBtn" type="button">コピー</button>
         </div>
       </div>
 
-      <button class="primary" id="applyBtn">Apply</button>
+      <button class="primary" id="applyBtn">反映</button>
     </aside>
 
     <main>
@@ -890,8 +892,8 @@
           <p id="metaLine">Key E / BPM 122</p>
         </div>
         <div class="actions">
-          <button id="copyBtn">Copy</button>
-          <button id="printBtn">Print</button>
+          <button id="copyBtn">コピー</button>
+          <button id="printBtn">印刷</button>
         </div>
       </div>
       <div class="status" id="status"></div>
@@ -996,6 +998,7 @@ Ending:
 
     let currentShift = 0;
     let sourceChart = defaultChart;
+    const undoStack = [];
 
     function saveState() {
       const state = {
@@ -1316,8 +1319,8 @@ Ending:
       els.originalKeyInput.value = originalKey;
       els.originalKeyRead.textContent = originalKey;
       els.nowKey.textContent = targetKey;
-      els.songTitle.textContent = els.titleInput.value || "Untitled";
-      els.metaLine.textContent = `Key ${targetKey} / BPM ${els.bpmInput.value || "122"} / ${els.meterInput.selectedOptions[0].textContent}`;
+      els.songTitle.textContent = els.titleInput.value || "無題";
+      els.metaLine.textContent = `キー ${targetKey} / BPM ${els.bpmInput.value || "122"} / ${els.meterInput.selectedOptions[0].textContent}`;
       renderSheet(output);
       els.textView.textContent = output;
       renderChart(output);
@@ -1334,15 +1337,42 @@ Ending:
       update();
     }
 
-    function insertIntoSource(text) {
+    function rememberSource(value = els.sourceInput.value) {
+      const current = value;
+      if (undoStack[undoStack.length - 1] !== current) {
+        undoStack.push(current);
+      }
+      if (undoStack.length > 80) undoStack.shift();
+    }
+
+    function undoSourceEdit() {
+      if (!undoStack.length) {
+        els.status.textContent = "戻せる編集がありません";
+        setTimeout(() => els.status.textContent = "", 1800);
+        return;
+      }
+      els.sourceInput.value = undoStack.pop();
+      applySourceEdit();
+      els.status.textContent = "ひとつ戻しました";
+      setTimeout(() => els.status.textContent = "", 1800);
+    }
+
+    function replaceSourceValue(value) {
+      rememberSource();
+      els.sourceInput.value = value;
+      applySourceEdit();
+    }
+
+    function insertIntoSource(text, options = {}) {
+      rememberSource();
       const input = els.sourceInput;
       const start = input.selectionStart ?? input.value.length;
       const end = input.selectionEnd ?? input.value.length;
       const before = input.value.slice(0, start);
       const after = input.value.slice(end);
-      const needsBeforeBreak = before && !before.endsWith("\n");
-      const needsAfterBreak = after && !text.endsWith("\n");
-      const insertion = `${needsBeforeBreak ? "\n" : ""}${text}${needsAfterBreak ? "\n" : ""}`;
+      const needsSpaceBefore = options.inline && before && !/[\s|]$/.test(before);
+      const needsSpaceAfter = options.inline && after && !/^[\s|]/.test(after);
+      const insertion = `${needsSpaceBefore ? " " : ""}${text}${needsSpaceAfter ? " " : ""}`;
       input.value = before + insertion + after;
       const cursor = before.length + insertion.length;
       input.focus();
@@ -1352,11 +1382,11 @@ Ending:
 
     function normalizeBarInput(value) {
       const trimmed = value.trim();
-      if (!trimmed) return "| C | F | G | C |\n";
+      if (!trimmed) return "| C | F | G | C |";
       if (trimmed.includes("|")) {
-        return `${trimmed}\n`;
+        return trimmed;
       }
-      return `| ${trimmed} |\n`;
+      return `| ${trimmed} |`;
     }
 
     function insertIntoBarInput(text) {
@@ -1397,8 +1427,8 @@ Ending:
       const roots = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"];
       const qualities = ["", "m", "7", "m7", "M7", "M7(9)", "mM7", "6", "m6", "dim7", "sus4", "add9", "7sus4", "m7(11)", "m7(9)"];
       fillPicker(els.rootPicker, roots);
-      fillPicker(els.qualityPicker, qualities, "major");
-      fillPicker(els.bassPicker, ["", ...roots], "no bass");
+      fillPicker(els.qualityPicker, qualities, "メジャー");
+      fillPicker(els.bassPicker, ["", ...roots], "ベースなし");
 
       ["C", "Dm7", "Em7", "F", "G", "Am", "Bm7b5", "C7", "CM7", "Csus4", "Cadd9", "C/G"].forEach(chord => {
         const button = document.createElement("button");
@@ -1481,27 +1511,28 @@ Ending:
     });
     document.querySelector("#resetColorsBtn").addEventListener("click", resetColors);
     document.querySelector("#applyBtn").addEventListener("click", () => {
+      rememberSource(sourceChart);
       applySourceEdit();
     });
     document.querySelector("#addSectionBtn").addEventListener("click", () => {
-      const name = els.sectionBuilderInput.value.trim() || "Section";
-      insertIntoSource(`${name}:\n`);
+      const name = els.sectionBuilderInput.value.trim() || "セクション";
+      insertIntoSource(`${name}:`, { inline: true });
       els.sectionBuilderInput.value = "";
     });
     document.querySelector("#addBarBtn").addEventListener("click", () => {
-      insertIntoSource(normalizeBarInput(els.barBuilderInput.value));
+      insertIntoSource(normalizeBarInput(els.barBuilderInput.value), { inline: true });
       els.barBuilderInput.value = "";
     });
     document.querySelector("#addLyricBtn").addEventListener("click", () => {
       const lyric = els.lyricBuilderInput.value.trim() || "ここに歌詞";
-      insertIntoSource(`${lyric}\n`);
+      insertIntoSource(lyric, { inline: true });
       els.lyricBuilderInput.value = "";
     });
     document.querySelector("#addBlankBtn").addEventListener("click", () => {
       insertIntoSource("\n");
     });
     document.querySelector("#addRepeatBtn").addEventListener("click", () => {
-      insertIntoSource("||: C | F | G | C :||\n");
+      insertIntoSource("||: C | F | G | C :||", { inline: true });
     });
     document.querySelector("#addStarterBtn").addEventListener("click", () => {
       insertIntoSource("Intro:\n| C | F | G | C |\n\nA:\n| C | G/B | Am | F |\nここに歌詞\n| C | G | F | C |\n\n");
@@ -1517,31 +1548,28 @@ Ending:
     });
     document.querySelector("#clearSourceBtn").addEventListener("click", () => {
       if (!confirm("コード譜本文をクリアしますか？")) return;
-      els.sourceInput.value = "";
-      sourceChart = "";
-      update();
-      els.status.textContent = "Chart source cleared";
+      replaceSourceValue("");
+      els.status.textContent = "クリアしました";
       setTimeout(() => els.status.textContent = "", 1800);
     });
     document.querySelector("#sampleSourceBtn").addEventListener("click", () => {
-      els.sourceInput.value = defaultChart;
-      sourceChart = defaultChart;
-      update();
-      els.status.textContent = "Sample restored";
+      replaceSourceValue(defaultChart);
+      els.status.textContent = "サンプルに戻しました";
       setTimeout(() => els.status.textContent = "", 1800);
     });
     document.querySelector("#pasteSourceBtn").addEventListener("click", async () => {
       try {
-        insertIntoSource(await navigator.clipboard.readText());
-        els.status.textContent = "Pasted";
+        insertIntoSource(await navigator.clipboard.readText(), { inline: false });
+        els.status.textContent = "貼り付けました";
       } catch {
-        els.status.textContent = "Paste is blocked by the browser";
+        els.status.textContent = "ブラウザに貼り付けをブロックされました";
       }
       setTimeout(() => els.status.textContent = "", 1800);
     });
+    document.querySelector("#undoSourceBtn").addEventListener("click", undoSourceEdit);
     document.querySelector("#copySourceBtn").addEventListener("click", async () => {
       await navigator.clipboard.writeText(els.sourceInput.value);
-      els.status.textContent = "Source copied";
+      els.status.textContent = "入力欄をコピーしました";
       setTimeout(() => els.status.textContent = "", 1800);
     });
     function setView(view) {
@@ -1558,7 +1586,7 @@ Ending:
     els.textBtn.addEventListener("click", () => setView("text"));
     document.querySelector("#copyBtn").addEventListener("click", async () => {
       await navigator.clipboard.writeText(els.textView.textContent);
-      els.status.textContent = "Copied";
+      els.status.textContent = "コピーしました";
       setTimeout(() => els.status.textContent = "", 1800);
     });
     document.querySelector("#printBtn").addEventListener("click", () => window.print());
