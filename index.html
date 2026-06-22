@@ -20,6 +20,11 @@
       --cyan-2: #72ffff;
       --paper: #fbfdff;
       --ink: #10204b;
+      --chord-color: #007c89;
+      --card-chord-color: #0d2466;
+      --lyric-color: #243a68;
+      --section-color: #052a70;
+      --rhythm-color: #d8662a;
       --shadow: 0 28px 80px rgba(0, 0, 0, .36);
       --radius: 8px;
       font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
@@ -307,6 +312,84 @@
       white-space: nowrap;
     }
 
+    .color-settings {
+      border: 1px solid rgba(198, 222, 255, .18);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: rgba(255, 255, 255, .045);
+    }
+
+    .color-settings .source-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .color-field {
+      display: grid;
+      grid-template-columns: 1fr 42px;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    input[type="color"] {
+      min-height: 34px;
+      padding: 3px;
+      cursor: pointer;
+    }
+
+    .picker-panel {
+      display: none;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid rgba(198, 222, 255, .18);
+      border-radius: var(--radius);
+      background: rgba(2, 7, 20, .36);
+    }
+
+    .picker-panel.open {
+      display: grid;
+    }
+
+    .picker-controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .picker-buttons,
+    .rhythm-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .picker-buttons button,
+    .rhythm-buttons button {
+      min-height: 34px;
+      padding: 5px 6px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .picker-preview {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--cyan);
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-weight: 900;
+    }
+
     button.primary,
     button.active {
       border-color: transparent;
@@ -402,6 +485,7 @@
       padding: 8px 4px 9px;
       font-size: 18px;
       font-weight: 650;
+      color: #eef5ff;
       letter-spacing: 0;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
@@ -453,7 +537,7 @@
     .chord {
       display: inline-flex;
       min-width: max-content;
-      color: #0d2466;
+      color: var(--card-chord-color);
       font-size: 17px;
       font-weight: 900;
       line-height: 1.18;
@@ -472,6 +556,13 @@
       font-size: 10px;
       font-weight: 900;
       line-height: 1;
+    }
+
+    .rhythm-mark {
+      color: var(--rhythm-color);
+      font-size: 17px;
+      font-weight: 950;
+      line-height: 1.18;
     }
 
     .plain {
@@ -509,7 +600,7 @@
     .sheet-section {
       display: inline-block;
       margin-top: 10px;
-      color: #052a70;
+      color: var(--section-color);
       font-weight: 950;
     }
 
@@ -519,14 +610,14 @@
     }
 
     .sheet-lyric {
-      color: #243a68;
+      color: var(--lyric-color);
       font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
       font-weight: 650;
       white-space: pre-wrap;
     }
 
     .sheet-chord {
-      color: #007c89;
+      color: var(--chord-color);
       font-weight: 950;
       text-shadow: 0 0 16px rgba(40, 242, 238, .18);
     }
@@ -534,6 +625,11 @@
     .sheet-barline {
       color: rgba(8, 20, 58, .42);
       font-weight: 800;
+    }
+
+    .sheet-rhythm {
+      color: var(--rhythm-color);
+      font-weight: 950;
     }
 
     .status {
@@ -707,6 +803,31 @@
         <input id="titleInput" type="text" value="Blue Lagoon">
       </div>
 
+      <div class="control color-settings">
+        <label>Color Settings</label>
+        <div class="color-grid">
+          <div class="color-field">
+            <span>Chord</span>
+            <input id="chordColorInput" type="color" value="#007c89">
+          </div>
+          <div class="color-field">
+            <span>Lyrics</span>
+            <input id="lyricColorInput" type="color" value="#243a68">
+          </div>
+          <div class="color-field">
+            <span>Section</span>
+            <input id="sectionColorInput" type="color" value="#052a70">
+          </div>
+          <div class="color-field">
+            <span>Rhythm</span>
+            <input id="rhythmColorInput" type="color" value="#d8662a">
+          </div>
+        </div>
+        <div class="source-actions">
+          <button id="resetColorsBtn" type="button">Reset Colors</button>
+        </div>
+      </div>
+
       <div class="control builder">
         <label>Template Builder</label>
         <div class="builder-grid">
@@ -724,9 +845,27 @@
           </div>
         </div>
         <div class="builder-actions">
-          <button id="addBlankBtn" type="button">Blank</button>
+          <button id="toggleChordPickerBtn" type="button">Chords</button>
           <button id="addRepeatBtn" type="button">Repeat</button>
           <button id="addStarterBtn" type="button">Starter</button>
+        </div>
+        <div id="chordPicker" class="picker-panel">
+          <div class="picker-controls">
+            <select id="rootPicker"></select>
+            <select id="qualityPicker"></select>
+            <select id="bassPicker"></select>
+          </div>
+          <div class="picker-preview">
+            <span id="chordPreview">C</span>
+            <button id="insertPickedChordBtn" type="button">Insert</button>
+          </div>
+          <div id="commonChordButtons" class="picker-buttons"></div>
+          <div class="rhythm-buttons">
+            <button class="rhythmBtn" data-symbol=">">Accent</button>
+            <button class="rhythmBtn" data-symbol="^">Sync</button>
+            <button class="rhythmBtn" data-symbol="-">Hold</button>
+            <button id="addBlankBtn" type="button">Blank</button>
+          </div>
         </div>
       </div>
 
@@ -736,6 +875,8 @@
         <div class="source-actions">
           <button id="clearSourceBtn" type="button">Clear</button>
           <button id="sampleSourceBtn" type="button">Sample</button>
+          <button id="pasteSourceBtn" type="button">Paste</button>
+          <button id="copySourceBtn" type="button">Copy</button>
         </div>
       </div>
 
@@ -830,9 +971,19 @@ Ending:
       meterInput: document.querySelector("#meterInput"),
       measureCount: document.querySelector("#measureCount"),
       beatCount: document.querySelector("#beatCount"),
+      chordColorInput: document.querySelector("#chordColorInput"),
+      lyricColorInput: document.querySelector("#lyricColorInput"),
+      sectionColorInput: document.querySelector("#sectionColorInput"),
+      rhythmColorInput: document.querySelector("#rhythmColorInput"),
       sectionBuilderInput: document.querySelector("#sectionBuilderInput"),
       barBuilderInput: document.querySelector("#barBuilderInput"),
       lyricBuilderInput: document.querySelector("#lyricBuilderInput"),
+      chordPicker: document.querySelector("#chordPicker"),
+      rootPicker: document.querySelector("#rootPicker"),
+      qualityPicker: document.querySelector("#qualityPicker"),
+      bassPicker: document.querySelector("#bassPicker"),
+      chordPreview: document.querySelector("#chordPreview"),
+      commonChordButtons: document.querySelector("#commonChordButtons"),
       sourceInput: document.querySelector("#sourceInput"),
       sheetView: document.querySelector("#sheetView"),
       chartView: document.querySelector("#chartView"),
@@ -853,6 +1004,7 @@ Ending:
         targetKey: els.targetKey.value,
         bpm: els.bpmInput.value,
         meter: els.meterInput.value,
+        colors: currentColors(),
         chart: els.sourceInput.value
       };
       localStorage.setItem(storageKey, JSON.stringify(state));
@@ -862,8 +1014,47 @@ Ending:
       try {
         return JSON.parse(localStorage.getItem(storageKey) || "null");
       } catch {
-        return null;
+      return null;
       }
+    }
+
+    function currentColors() {
+      return {
+        chord: els.chordColorInput.value,
+        lyric: els.lyricColorInput.value,
+        section: els.sectionColorInput.value,
+        rhythm: els.rhythmColorInput.value
+      };
+    }
+
+    function applyColors(colors = currentColors()) {
+      const nextColors = {
+        chord: "#007c89",
+        lyric: "#243a68",
+        section: "#052a70",
+        rhythm: "#d8662a",
+        ...colors
+      };
+      const root = document.documentElement;
+      root.style.setProperty("--chord-color", nextColors.chord);
+      root.style.setProperty("--card-chord-color", nextColors.chord);
+      root.style.setProperty("--lyric-color", nextColors.lyric);
+      root.style.setProperty("--section-color", nextColors.section);
+      root.style.setProperty("--rhythm-color", nextColors.rhythm);
+      els.chordColorInput.value = nextColors.chord;
+      els.lyricColorInput.value = nextColors.lyric;
+      els.sectionColorInput.value = nextColors.section;
+      els.rhythmColorInput.value = nextColors.rhythm;
+    }
+
+    function resetColors() {
+      applyColors({
+        chord: "#007c89",
+        lyric: "#243a68",
+        section: "#052a70",
+        rhythm: "#d8662a"
+      });
+      update();
     }
 
     function mod(value, by) {
@@ -932,13 +1123,17 @@ Ending:
       return /^([A-G](?:#|b)?)([^/\s|:]*)?(?:\/([A-G](?:#|b)?))?$/.test(token);
     }
 
+    function isRhythmToken(token) {
+      return [">", "^", "-", "~"].includes(token);
+    }
+
     function isChordOnlyLine(line) {
       const tokens = line
         .replace(/:\|\||\|\|:|:|\|\||[,，]/g, " ")
         .trim()
         .split(/\s+/)
         .filter(Boolean);
-      return tokens.length > 0 && tokens.every(isChordToken);
+      return tokens.length > 0 && tokens.every(token => isChordToken(token) || isRhythmToken(token));
     }
 
     function isCueLine(line) {
@@ -967,19 +1162,23 @@ Ending:
       number.textContent = measureNumber;
       bar.appendChild(number);
 
-      const chords = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
-      const beatStep = chords.length ? beatsPerMeasure / chords.length : beatsPerMeasure;
-      chords.forEach((chord, index) => {
+      const tokens = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
+      const beatTokens = tokens.filter(token => isChordToken(token));
+      const beatStep = beatTokens.length ? beatsPerMeasure / beatTokens.length : beatsPerMeasure;
+      let chordIndex = 0;
+      tokens.forEach(token => {
         const chip = document.createElement("span");
         chip.className = "chord-chip";
         const beat = document.createElement("span");
         beat.className = "beat-mark";
-        beat.textContent = formatBeat(1 + index * beatStep);
+        const isChord = isChordToken(token);
+        beat.textContent = isChord ? formatBeat(1 + chordIndex * beatStep) : "";
         const span = document.createElement("span");
-        span.className = "chord";
-        span.textContent = chord;
+        span.className = isChord ? "chord" : "rhythm-mark";
+        span.textContent = token;
         chip.append(beat, span);
         bar.appendChild(chip);
+        if (isChord) chordIndex += 1;
       });
       row.appendChild(bar);
     }
@@ -988,6 +1187,8 @@ Ending:
       const span = document.createElement("span");
       if (/^\|+$|^:\|\|$|^\|\|:$|^:?\|\|:?$/.test(token)) {
         span.className = "sheet-barline";
+      } else if (isRhythmToken(token)) {
+        span.className = "sheet-rhythm";
       } else if (isChordToken(token.replace(/:$/, ""))) {
         span.className = "sheet-chord";
       } else {
@@ -1158,6 +1359,61 @@ Ending:
       return `| ${trimmed} |\n`;
     }
 
+    function insertIntoBarInput(text) {
+      const input = els.barBuilderInput;
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? input.value.length;
+      const before = input.value.slice(0, start);
+      const after = input.value.slice(end);
+      const spacerBefore = before && !/\s$/.test(before) ? " " : "";
+      const spacerAfter = after && !/^\s/.test(after) ? " " : "";
+      input.value = before + spacerBefore + text + spacerAfter + after;
+      const cursor = (before + spacerBefore + text + spacerAfter).length;
+      input.focus();
+      input.setSelectionRange(cursor, cursor);
+    }
+
+    function currentPickedChord() {
+      const root = els.rootPicker.value;
+      const quality = els.qualityPicker.value;
+      const bass = els.bassPicker.value;
+      return `${root}${quality}${bass ? "/" + bass : ""}`;
+    }
+
+    function updateChordPreview() {
+      els.chordPreview.textContent = currentPickedChord();
+    }
+
+    function fillPicker(select, values, labelForEmpty = "") {
+      values.forEach(value => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value || labelForEmpty;
+        select.appendChild(option);
+      });
+    }
+
+    function setupChordPicker() {
+      const roots = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"];
+      const qualities = ["", "m", "7", "m7", "M7", "M7(9)", "mM7", "6", "m6", "dim7", "sus4", "add9", "7sus4", "m7(11)", "m7(9)"];
+      fillPicker(els.rootPicker, roots);
+      fillPicker(els.qualityPicker, qualities, "major");
+      fillPicker(els.bassPicker, ["", ...roots], "no bass");
+
+      ["C", "Dm7", "Em7", "F", "G", "Am", "Bm7b5", "C7", "CM7", "Csus4", "Cadd9", "C/G"].forEach(chord => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = chord;
+        button.addEventListener("click", () => insertIntoBarInput(chord));
+        els.commonChordButtons.appendChild(button);
+      });
+
+      [els.rootPicker, els.qualityPicker, els.bassPicker].forEach(select => {
+        select.addEventListener("change", updateChordPreview);
+      });
+      updateChordPreview();
+    }
+
     function fillKeySelect(select) {
       [...sharpKeys, "Bb", "Eb", "Ab", "Db", "Gb"].forEach(key => {
         const option = document.createElement("option");
@@ -1169,6 +1425,7 @@ Ending:
 
     fillKeySelect(els.targetKey);
     fillKeySelect(els.originalKeyInput);
+    setupChordPicker();
 
     els.sourceInput.value = defaultChart;
     els.targetKey.value = originalKey;
@@ -1180,11 +1437,18 @@ Ending:
       els.titleInput.value = saved.title || "Blue Lagoon";
       els.bpmInput.value = saved.bpm || "122";
       els.meterInput.value = saved.meter || "4";
+      if (saved.colors) {
+        applyColors(saved.colors);
+      } else {
+        applyColors();
+      }
       sourceChart = saved.chart || defaultChart;
       els.sourceInput.value = sourceChart;
       currentShift = saved.targetKey && noteIndex[saved.targetKey] !== undefined
         ? mod(noteIndex[saved.targetKey] - noteIndex[originalKey], 12)
         : 0;
+    } else {
+      applyColors();
     }
 
     document.querySelector("#downBtn").addEventListener("click", () => {
@@ -1209,6 +1473,13 @@ Ending:
     els.titleInput.addEventListener("input", update);
     els.bpmInput.addEventListener("input", update);
     els.meterInput.addEventListener("change", update);
+    [els.chordColorInput, els.lyricColorInput, els.sectionColorInput, els.rhythmColorInput].forEach(input => {
+      input.addEventListener("input", () => {
+        applyColors();
+        update();
+      });
+    });
+    document.querySelector("#resetColorsBtn").addEventListener("click", resetColors);
     document.querySelector("#applyBtn").addEventListener("click", () => {
       applySourceEdit();
     });
@@ -1235,6 +1506,15 @@ Ending:
     document.querySelector("#addStarterBtn").addEventListener("click", () => {
       insertIntoSource("Intro:\n| C | F | G | C |\n\nA:\n| C | G/B | Am | F |\nここに歌詞\n| C | G | F | C |\n\n");
     });
+    document.querySelector("#toggleChordPickerBtn").addEventListener("click", () => {
+      els.chordPicker.classList.toggle("open");
+    });
+    document.querySelector("#insertPickedChordBtn").addEventListener("click", () => {
+      insertIntoBarInput(currentPickedChord());
+    });
+    document.querySelectorAll(".rhythmBtn").forEach(button => {
+      button.addEventListener("click", () => insertIntoBarInput(button.dataset.symbol));
+    });
     document.querySelector("#clearSourceBtn").addEventListener("click", () => {
       if (!confirm("コード譜本文をクリアしますか？")) return;
       els.sourceInput.value = "";
@@ -1248,6 +1528,20 @@ Ending:
       sourceChart = defaultChart;
       update();
       els.status.textContent = "Sample restored";
+      setTimeout(() => els.status.textContent = "", 1800);
+    });
+    document.querySelector("#pasteSourceBtn").addEventListener("click", async () => {
+      try {
+        insertIntoSource(await navigator.clipboard.readText());
+        els.status.textContent = "Pasted";
+      } catch {
+        els.status.textContent = "Paste is blocked by the browser";
+      }
+      setTimeout(() => els.status.textContent = "", 1800);
+    });
+    document.querySelector("#copySourceBtn").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(els.sourceInput.value);
+      els.status.textContent = "Source copied";
       setTimeout(() => els.status.textContent = "", 1800);
     });
     function setView(view) {
