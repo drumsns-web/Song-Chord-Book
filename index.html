@@ -1053,6 +1053,7 @@ Ending:
       bassPicker: document.querySelector("#bassPicker"),
       chordPreview: document.querySelector("#chordPreview"),
       commonChordButtons: document.querySelector("#commonChordButtons"),
+      gridResolutionInput: document.querySelector("#gridResolutionInput"),
       grid16Inputs: Array.from(document.querySelectorAll("#grid16Inputs input")),
       sourceInput: document.querySelector("#sourceInput"),
       sheetView: document.querySelector("#sheetView"),
@@ -1137,8 +1138,20 @@ Ending:
       return (preferFlats ? flatKeys : sharpKeys)[mod(index, 12)];
     }
 
+    function keyRoot(key) {
+      return key.endsWith("m") ? key.slice(0, -1) : key;
+    }
+
+    function keyMode(key) {
+      return key.endsWith("m") ? "m" : "";
+    }
+
+    function keyIndex(key) {
+      return noteIndex[keyRoot(key)];
+    }
+
     function prefersFlatsForTarget(targetKey) {
-      return flatPreferred.has(targetKey);
+      return flatPreferred.has(keyRoot(targetKey));
     }
 
     function transposeRoot(root, shift, preferFlats) {
@@ -1251,9 +1264,9 @@ Ending:
       bar.appendChild(number);
 
       const tokens = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
-      const isGridBar = tokens.length === 16 && tokens.some(isGridToken);
+      const isGridBar = [4, 8, 16].includes(tokens.length) && tokens.some(isGridToken);
       const beatTokens = tokens.filter(token => isChordToken(token));
-      const beatStep = isGridBar ? beatsPerMeasure / 16 : (beatTokens.length ? beatsPerMeasure / beatTokens.length : beatsPerMeasure);
+      const beatStep = isGridBar ? beatsPerMeasure / tokens.length : (beatTokens.length ? beatsPerMeasure / beatTokens.length : beatsPerMeasure);
       let chordIndex = 0;
       tokens.forEach((token, tokenIndex) => {
         const chip = document.createElement("span");
@@ -1398,8 +1411,8 @@ Ending:
     }
 
     function update() {
-      const targetIndex = mod(noteIndex[originalKey] + currentShift, 12);
-      const targetKey = keyName(targetIndex, prefersFlatsForTarget(els.targetKey.value));
+      const targetIndex = mod(keyIndex(originalKey) + currentShift, 12);
+      const targetKey = keyName(targetIndex, prefersFlatsForTarget(els.targetKey.value)) + keyMode(els.targetKey.value || originalKey);
       const preferFlats = prefersFlatsForTarget(targetKey);
       const output = transposeText(sourceChart, currentShift, preferFlats);
 
@@ -1416,7 +1429,7 @@ Ending:
     }
 
     function setTargetKey(key) {
-      currentShift = mod(noteIndex[key] - noteIndex[originalKey], 12);
+      currentShift = mod(keyIndex(key) - keyIndex(originalKey), 12);
       update();
     }
 
@@ -1481,7 +1494,7 @@ Ending:
       if (activeGridInput) {
         activeGridInput.value = text;
         const index = els.grid16Inputs.indexOf(activeGridInput);
-        const next = els.grid16Inputs[index + 1];
+        const next = els.grid16Inputs.slice(index + 1, currentGridSize()).find(input => !input.classList.contains("hidden"));
         if (next) {
           next.focus();
           activeGridInput = next;
@@ -1543,15 +1556,19 @@ Ending:
     }
 
     function gridBarText() {
-      const tokens = els.grid16Inputs.map(input => input.value.trim() || ".");
+      const tokens = els.grid16Inputs.slice(0, currentGridSize()).map(input => input.value.trim() || ".");
       return `| ${tokens.join(" ")} |`;
     }
 
-    function tokensToGridBar(tokens) {
-      const grid = Array(16).fill(".");
-      const count = Math.min(tokens.length, 16);
+    function currentGridSize() {
+      return Number.parseInt(els.gridResolutionInput.value, 10) || 16;
+    }
+
+    function tokensToGridBar(tokens, gridSize = currentGridSize()) {
+      const grid = Array(gridSize).fill(".");
+      const count = Math.min(tokens.length, gridSize);
       tokens.slice(0, count).forEach((token, index) => {
-        const slot = Math.min(15, Math.floor(index * 16 / count));
+        const slot = Math.min(gridSize - 1, Math.floor(index * gridSize / count));
         grid[slot] = token;
       });
       return `| ${grid.join(" ")} |`;
@@ -1563,12 +1580,13 @@ Ending:
           return line;
         }
         const tokens = barTokensFromLine(line);
-        if (tokens.length <= 16) {
+        const gridSize = currentGridSize();
+        if (tokens.length <= gridSize) {
           return tokensToGridBar(tokens);
         }
         const bars = [];
-        for (let i = 0; i < tokens.length; i += 16) {
-          bars.push(tokensToGridBar(tokens.slice(i, i + 16)));
+        for (let i = 0; i < tokens.length; i += gridSize) {
+          bars.push(tokensToGridBar(tokens.slice(i, i + gridSize), gridSize));
         }
         return bars.join("\n");
       }).join("\n");
@@ -1582,8 +1600,31 @@ Ending:
       if (activeGridInput) activeGridInput.focus();
     }
 
+    function fillGridDots() {
+      els.grid16Inputs.slice(0, currentGridSize()).forEach(input => {
+        input.value = ".";
+      });
+    }
+
+    function updateGridResolution() {
+      const labels = {
+        4: ["1", "2", "3", "4"],
+        8: ["1", "+", "2", "+", "3", "+", "4", "+"],
+        16: ["1", "e", "+", "a", "2", "e", "+", "a", "3", "e", "+", "a", "4", "e", "+", "a"]
+      };
+      const size = currentGridSize();
+      els.grid16Inputs.forEach((input, index) => {
+        input.classList.toggle("hidden", index >= size);
+        input.placeholder = labels[size][index] || "";
+        if (index >= size) input.value = "";
+      });
+      if (activeGridInput && els.grid16Inputs.indexOf(activeGridInput) >= size) {
+        activeGridInput = els.grid16Inputs[0] || null;
+      }
+    }
+
     function fillKeySelect(select) {
-      [...sharpKeys, "Bb", "Eb", "Ab", "Db", "Gb"].forEach(key => {
+      [...sharpKeys, "Bb", "Eb", "Ab", "Db", "Gb"].flatMap(key => [key, `${key}m`]).forEach(key => {
         const option = document.createElement("option");
         option.value = key;
         option.textContent = key;
@@ -1594,6 +1635,7 @@ Ending:
     fillKeySelect(els.targetKey);
     fillKeySelect(els.originalKeyInput);
     setupChordPicker();
+    updateGridResolution();
     els.grid16Inputs.forEach(input => {
       input.addEventListener("focus", () => {
         activeGridInput = input;
@@ -1609,7 +1651,7 @@ Ending:
 
     const saved = loadState();
     if (saved) {
-      originalKey = noteIndex[saved.originalKey] !== undefined ? saved.originalKey : originalKey;
+      originalKey = keyIndex(saved.originalKey) !== undefined ? saved.originalKey : originalKey;
       els.titleInput.value = saved.title || "Blue Lagoon";
       els.bpmInput.value = saved.bpm || "122";
       els.meterInput.value = saved.meter || "4";
@@ -1620,8 +1662,8 @@ Ending:
       }
       sourceChart = saved.chart || defaultChart;
       els.sourceInput.value = sourceChart;
-      currentShift = saved.targetKey && noteIndex[saved.targetKey] !== undefined
-        ? mod(noteIndex[saved.targetKey] - noteIndex[originalKey], 12)
+      currentShift = saved.targetKey && keyIndex(saved.targetKey) !== undefined
+        ? mod(keyIndex(saved.targetKey) - keyIndex(originalKey), 12)
         : 0;
     } else {
       applyColors();
@@ -1637,13 +1679,14 @@ Ending:
     });
     document.querySelector("#resetBtn").addEventListener("click", () => {
       currentShift = 0;
+      els.targetKey.value = originalKey;
       update();
     });
     els.targetKey.addEventListener("change", event => setTargetKey(event.target.value));
     els.originalKeyInput.addEventListener("change", event => {
       const currentTarget = els.targetKey.value;
       originalKey = event.target.value;
-      currentShift = mod(noteIndex[currentTarget] - noteIndex[originalKey], 12);
+      currentShift = mod(keyIndex(currentTarget) - keyIndex(originalKey), 12);
       update();
     });
     els.titleInput.addEventListener("input", update);
@@ -1684,6 +1727,8 @@ Ending:
       insertIntoSource(gridBarText(), { inline: true });
     });
     document.querySelector("#clearGridBtn").addEventListener("click", clearGrid);
+    document.querySelector("#fillGridDotsBtn").addEventListener("click", fillGridDots);
+    els.gridResolutionInput.addEventListener("change", updateGridResolution);
     document.querySelector("#addStarterBtn").addEventListener("click", () => {
       insertIntoSource("Intro:\n| C | F | G | C |\n\nA:\n| C | G/B | Am | F |\nここに歌詞\n| C | G | F | C |\n\n");
     });
@@ -1709,7 +1754,7 @@ Ending:
     });
     document.querySelector("#autoGridBtn").addEventListener("click", () => {
       replaceSourceValue(autoGridText(els.sourceInput.value));
-      els.status.textContent = "コード行を16分グリッドへ配置しました";
+      els.status.textContent = `コード行を${currentGridSize()}分割グリッドへ配置しました`;
       setTimeout(() => els.status.textContent = "", 2200);
     });
     document.querySelector("#pasteSourceBtn").addEventListener("click", async () => {
