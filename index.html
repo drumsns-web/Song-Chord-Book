@@ -177,6 +177,34 @@
       font-size: 13px;
     }
 
+    .editing-line-panel {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      min-height: 36px;
+      margin-top: 8px;
+      padding: 7px 9px;
+      border: 1px solid rgba(40, 242, 238, .24);
+      border-radius: var(--radius);
+      background: rgba(40, 242, 238, .08);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .editing-line-panel strong {
+      color: var(--cyan-2);
+      white-space: nowrap;
+    }
+
+    .editing-line-panel span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .transpose-card {
       border: 1px solid rgba(40, 242, 238, .24);
       border-radius: var(--radius);
@@ -571,6 +599,25 @@
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       border-bottom: 1px solid rgba(198, 222, 255, .16);
+    }
+
+    .active-edit-line {
+      position: relative;
+      outline: 2px solid rgba(40, 242, 238, .72);
+      outline-offset: 3px;
+      background: rgba(40, 242, 238, .12);
+      box-shadow: 0 0 0 5px rgba(40, 242, 238, .08);
+    }
+
+    .sheet-line.active-edit-line {
+      border-radius: var(--radius);
+      padding-inline: 6px;
+    }
+
+    .bar.active-edit-line,
+    .lyric-line.active-edit-line,
+    .cue-line.active-edit-line {
+      outline-offset: 2px;
     }
 
     .cue-line {
@@ -1006,6 +1053,10 @@
       <div class="control">
         <label for="sourceInput">コード譜入力</label>
         <textarea id="sourceInput" spellcheck="false"></textarea>
+        <div class="editing-line-panel" id="editingLineInfo" aria-live="polite">
+          <strong>編集中</strong>
+          <span>1行目</span>
+        </div>
         <div class="source-actions">
           <button id="undoSourceBtn" type="button">アンドゥ</button>
           <button id="clearSourceBtn" type="button">クリア</button>
@@ -1128,6 +1179,7 @@ Ending:
       beatResolutionInputs: Array.from(document.querySelectorAll(".beatResolutionInput")),
       grid16Inputs: Array.from(document.querySelectorAll("#grid16Inputs input")),
       sourceInput: document.querySelector("#sourceInput"),
+      editingLineInfo: document.querySelector("#editingLineInfo"),
       sheetView: document.querySelector("#sheetView"),
       chartView: document.querySelector("#chartView"),
       textView: document.querySelector("#textView"),
@@ -1141,6 +1193,7 @@ Ending:
     let sourceChart = defaultChart;
     const undoStack = [];
     let activeGridInput = null;
+    let activeSourceLine = 0;
 
     function saveState() {
       const state = {
@@ -1263,14 +1316,14 @@ Ending:
       const sections = [];
       let current = { name: "Chart", lines: [] };
 
-      text.split(/\r?\n/).forEach(raw => {
+      text.split(/\r?\n/).forEach((raw, lineNumber) => {
         const line = raw.trimEnd();
         const header = line.match(/^([^|]+):$/);
         if (header) {
           if (current.lines.length) sections.push(current);
           current = { name: header[1].trim(), lines: [] };
         } else if (line.trim() || current.lines.length) {
-          current.lines.push(line);
+          current.lines.push({ text: line, lineNumber });
         }
       });
 
@@ -1329,6 +1382,36 @@ Ending:
       const last = trimmed[trimmed.length - 1];
       const bracketed = (first === "[" && last === "]") || (first === "(" && last === ")");
       return bracketed || /^(Intro|Inter|Verse|A|B|C|D|Bridge|Chorus|Ending|Solo|Hook|Pre|Outro)\b/i.test(trimmed);
+    }
+
+    function cursorLineIndex() {
+      const position = els.sourceInput.selectionStart ?? 0;
+      return els.sourceInput.value.slice(0, position).split(/\r?\n/).length - 1;
+    }
+
+    function currentInputLineText(lineIndex = activeSourceLine) {
+      return (els.sourceInput.value.split(/\r?\n/)[lineIndex] || "").trim();
+    }
+
+    function markActiveEditLine(root = document) {
+      root.querySelectorAll(".active-edit-line").forEach(node => {
+        node.classList.remove("active-edit-line");
+      });
+      root.querySelectorAll(`[data-source-line="${activeSourceLine}"]`).forEach(node => {
+        node.classList.add("active-edit-line");
+      });
+    }
+
+    function updateEditingLineInfo(options = {}) {
+      activeSourceLine = Math.max(0, cursorLineIndex());
+      const text = currentInputLineText();
+      els.editingLineInfo.querySelector("span").textContent = `${activeSourceLine + 1}行目${text ? `: ${text}` : ""}`;
+      markActiveEditLine();
+
+      if (options.scrollPreview) {
+        const active = document.querySelector(`[data-source-line="${activeSourceLine}"]`);
+        active?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
     }
 
     function parseChordForKey(token) {
@@ -1467,19 +1550,21 @@ Ending:
       setTimeout(() => els.status.textContent = "", 2600);
     }
 
-    function renderPlainLine(line, bars) {
+    function renderPlainLine(line, bars, sourceLine = -1) {
       const row = document.createElement("div");
       row.className = "lyric-row";
       const text = document.createElement("div");
       text.className = isCueLine(line) ? "cue-line" : "lyric-line";
+      if (sourceLine >= 0) text.dataset.sourceLine = sourceLine;
       text.textContent = line.trim();
       row.appendChild(text);
       bars.appendChild(row);
     }
 
-    function renderBarFromChords(part, row, beatsPerMeasure, measureNumber) {
+    function renderBarFromChords(part, row, beatsPerMeasure, measureNumber, sourceLine = -1) {
       const bar = document.createElement("div");
       bar.className = part.includes(":") ? "bar repeat" : "bar";
+      if (sourceLine >= 0) bar.dataset.sourceLine = sourceLine;
       const number = document.createElement("span");
       number.className = "bar-number";
       number.textContent = measureNumber;
@@ -1528,9 +1613,10 @@ Ending:
 
     function renderSheet(text) {
       els.sheetView.innerHTML = "";
-      text.split(/\r?\n/).forEach(line => {
+      text.split(/\r?\n/).forEach((line, lineIndex) => {
         const lineEl = document.createElement("div");
         lineEl.className = "sheet-line";
+        lineEl.dataset.sourceLine = lineIndex;
 
         if (!line.trim()) {
           lineEl.textContent = " ";
@@ -1585,6 +1671,7 @@ Ending:
 
         els.sheetView.appendChild(lineEl);
       });
+      markActiveEditLine(els.sheetView);
     }
 
     function renderChart(text) {
@@ -1602,25 +1689,27 @@ Ending:
         const bars = document.createElement("div");
         bars.className = "bars";
 
-        section.lines.forEach(line => {
+        section.lines.forEach(lineItem => {
+          const line = lineItem.text;
+          const sourceLine = lineItem.lineNumber;
           if (!line.trim()) return;
           if (!line.includes("|")) {
             if (isChordOnlyLine(line)) {
               const row = document.createElement("div");
               row.className = "bar-row";
               measureCounter += 1;
-              renderBarFromChords(line.trim(), row, beatsPerMeasure, measureCounter);
+              renderBarFromChords(line.trim(), row, beatsPerMeasure, measureCounter, sourceLine);
               bars.appendChild(row);
               return;
             }
 
-            renderPlainLine(line, bars);
+            renderPlainLine(line, bars, sourceLine);
             return;
           }
 
           const parts = line.split("|").map(part => part.trim()).filter(Boolean);
           if (!parts.some(isChordOnlyLine)) {
-            renderPlainLine(line, bars);
+            renderPlainLine(line, bars, sourceLine);
             return;
           }
 
@@ -1628,11 +1717,11 @@ Ending:
           row.className = "bar-row";
           parts.forEach(part => {
             if (!isChordOnlyLine(part)) {
-              renderPlainLine(part, bars);
+              renderPlainLine(part, bars, sourceLine);
               return;
             }
             measureCounter += 1;
-            renderBarFromChords(part, row, beatsPerMeasure, measureCounter);
+            renderBarFromChords(part, row, beatsPerMeasure, measureCounter, sourceLine);
           });
           if (row.children.length) {
             bars.appendChild(row);
@@ -1644,6 +1733,7 @@ Ending:
       });
       els.measureCount.textContent = measureCounter;
       els.beatCount.textContent = measureCounter * beatsPerMeasure;
+      markActiveEditLine(els.chartView);
     }
 
     function update() {
@@ -1661,6 +1751,7 @@ Ending:
       renderSheet(output);
       els.textView.textContent = output;
       renderChart(output);
+      updateEditingLineInfo();
       saveState();
     }
 
@@ -1900,6 +1991,10 @@ Ending:
     els.sourceInput.value = defaultChart;
     els.targetKey.value = originalKey;
     els.originalKeyInput.value = originalKey;
+    ["click", "keyup", "select", "focus"].forEach(eventName => {
+      els.sourceInput.addEventListener(eventName, () => updateEditingLineInfo({ scrollPreview: eventName === "click" || eventName === "focus" }));
+    });
+    els.sourceInput.addEventListener("input", updateEditingLineInfo);
 
     const saved = loadState();
     if (saved) {
