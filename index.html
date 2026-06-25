@@ -1194,6 +1194,7 @@ Ending:
     const undoStack = [];
     let activeGridInput = null;
     let activeSourceLine = 0;
+    let sourceEditArmed = true;
 
     function saveState() {
       const state = {
@@ -1402,16 +1403,15 @@ Ending:
       });
     }
 
-    function updateEditingLineInfo(options = {}) {
+    function updateEditingLineInfo() {
       activeSourceLine = Math.max(0, cursorLineIndex());
       const text = currentInputLineText();
-      els.editingLineInfo.querySelector("span").textContent = `${activeSourceLine + 1}行目${text ? `: ${text}` : ""}`;
+      const start = els.sourceInput.selectionStart ?? 0;
+      const end = els.sourceInput.selectionEnd ?? start;
+      const selected = Math.abs(end - start);
+      const selectionText = selected ? ` / ${selected}文字選択中` : "";
+      els.editingLineInfo.querySelector("span").textContent = `${activeSourceLine + 1}行目${selectionText}${text ? `: ${text}` : ""}`;
       markActiveEditLine();
-
-      if (options.scrollPreview) {
-        const active = document.querySelector(`[data-source-line="${activeSourceLine}"]`);
-        active?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
     }
 
     function parseChordForKey(token) {
@@ -1760,9 +1760,27 @@ Ending:
       update();
     }
 
+    function preserveSourceView(callback) {
+      const input = els.sourceInput;
+      const scrollTop = input.scrollTop;
+      const scrollLeft = input.scrollLeft;
+      const selectionStart = input.selectionStart ?? 0;
+      const selectionEnd = input.selectionEnd ?? selectionStart;
+      callback();
+      requestAnimationFrame(() => {
+        input.scrollTop = scrollTop;
+        input.scrollLeft = scrollLeft;
+        if (document.activeElement === input) {
+          input.setSelectionRange(selectionStart, selectionEnd);
+        }
+      });
+    }
+
     function applySourceEdit() {
-      sourceChart = els.sourceInput.value;
-      update();
+      preserveSourceView(() => {
+        sourceChart = els.sourceInput.value;
+        update();
+      });
     }
 
     function rememberSource(value = els.sourceInput.value) {
@@ -1794,6 +1812,9 @@ Ending:
     function insertIntoSource(text, options = {}) {
       rememberSource();
       const input = els.sourceInput;
+      sourceEditArmed = true;
+      const scrollTop = input.scrollTop;
+      const scrollLeft = input.scrollLeft;
       const start = input.selectionStart ?? input.value.length;
       const end = input.selectionEnd ?? input.value.length;
       const before = input.value.slice(0, start);
@@ -1803,8 +1824,10 @@ Ending:
       const insertion = `${needsSpaceBefore ? " " : ""}${text}${needsSpaceAfter ? " " : ""}`;
       input.value = before + insertion + after;
       const cursor = before.length + insertion.length;
-      input.focus();
+      input.focus({ preventScroll: true });
       input.setSelectionRange(cursor, cursor);
+      input.scrollTop = scrollTop;
+      input.scrollLeft = scrollLeft;
       applySourceEdit();
     }
 
@@ -1841,6 +1864,14 @@ Ending:
       input.setSelectionRange(cursor, cursor);
     }
 
+    function insertMusicalToken(text) {
+      if (sourceEditArmed || document.activeElement === els.sourceInput) {
+        insertIntoSource(text, { inline: true });
+      } else {
+        insertIntoBarInput(text);
+      }
+    }
+
     function currentPickedChord() {
       const root = els.rootPicker.value;
       const quality = els.qualityPicker.value;
@@ -1872,7 +1903,7 @@ Ending:
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = chord;
-        button.addEventListener("click", () => insertIntoBarInput(chord));
+        button.addEventListener("click", () => insertMusicalToken(chord));
         els.commonChordButtons.appendChild(button);
       });
 
@@ -1982,19 +2013,34 @@ Ending:
     els.grid16Inputs.forEach(input => {
       input.addEventListener("focus", () => {
         activeGridInput = input;
+        sourceEditArmed = false;
       });
     });
     els.barBuilderInput.addEventListener("focus", () => {
       activeGridInput = null;
+      sourceEditArmed = false;
+    });
+    els.lyricBuilderInput.addEventListener("focus", () => {
+      sourceEditArmed = false;
+    });
+    els.sectionBuilderInput.addEventListener("focus", () => {
+      sourceEditArmed = false;
     });
 
     els.sourceInput.value = defaultChart;
     els.targetKey.value = originalKey;
     els.originalKeyInput.value = originalKey;
-    ["click", "keyup", "select", "focus"].forEach(eventName => {
-      els.sourceInput.addEventListener(eventName, () => updateEditingLineInfo({ scrollPreview: eventName === "click" || eventName === "focus" }));
+    ["click", "keyup", "select", "focus", "mouseup", "touchend"].forEach(eventName => {
+      els.sourceInput.addEventListener(eventName, () => {
+        sourceEditArmed = true;
+        activeGridInput = null;
+        updateEditingLineInfo();
+      });
     });
-    els.sourceInput.addEventListener("input", updateEditingLineInfo);
+    els.sourceInput.addEventListener("input", () => {
+      sourceEditArmed = true;
+      updateEditingLineInfo();
+    });
 
     const saved = loadState();
     if (saved) {
@@ -2090,10 +2136,10 @@ Ending:
       els.chordPicker.classList.toggle("open");
     });
     document.querySelector("#insertPickedChordBtn").addEventListener("click", () => {
-      insertIntoBarInput(currentPickedChord());
+      insertMusicalToken(currentPickedChord());
     });
     document.querySelectorAll(".rhythmBtn").forEach(button => {
-      button.addEventListener("click", () => insertIntoBarInput(button.dataset.symbol));
+      button.addEventListener("click", () => insertMusicalToken(button.dataset.symbol));
     });
     document.querySelector("#clearSourceBtn").addEventListener("click", () => {
       if (!confirm("コード譜本文をクリアしますか？")) return;
