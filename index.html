@@ -25,6 +25,8 @@
       --lyric-color: #243a68;
       --section-color: #052a70;
       --rhythm-color: #d8662a;
+      --beat-dot-color: #d8662a;
+      --beat-dot-scale: 1.45;
       --shadow: 0 28px 80px rgba(0, 0, 0, .36);
       --radius: 8px;
       font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
@@ -273,6 +275,19 @@
       grid-template-columns: repeat(3, 1fr);
     }
 
+    .key-detect {
+      display: grid;
+      gap: 8px;
+      margin: 8px 0 14px;
+    }
+
+    .key-detect-result {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
     .source-actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -337,6 +352,11 @@
       color: var(--muted);
       font-size: 12px;
       font-weight: 800;
+    }
+
+    .color-field.wide {
+      grid-template-columns: 1fr;
+      grid-column: 1 / -1;
     }
 
     input[type="color"] {
@@ -405,6 +425,22 @@
       margin-top: 10px;
     }
 
+    .beat-resolution {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .beat-resolution label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
     .grid-cell {
       min-height: 36px;
       padding: 6px;
@@ -424,6 +460,15 @@
     .sheet-grid-dot {
       color: rgba(13, 36, 102, .28);
       font-weight: 900;
+    }
+
+    .grid-dot.beat-grid-dot,
+    .sheet-grid-dot.beat-grid-dot {
+      color: var(--beat-dot-color);
+      display: inline-block;
+      font-size: calc(1em * var(--beat-dot-scale));
+      line-height: .8;
+      transform: translateY(.03em);
     }
 
     button.primary,
@@ -798,6 +843,10 @@
           <label for="originalKeyInput">原曲キー</label>
           <select id="originalKeyInput"></select>
         </div>
+        <div class="key-detect">
+          <button id="detectKeyBtn" type="button">キー推定</button>
+          <div id="keyDetectResult" class="key-detect-result" aria-live="polite"></div>
+        </div>
         <div class="stepper">
           <button id="downBtn" title="半音下げる">-1</button>
           <button id="resetBtn" class="primary" title="原曲キーに戻す">リセット</button>
@@ -858,6 +907,18 @@
             <span>記号</span>
             <input id="rhythmColorInput" type="color" value="#d8662a">
           </div>
+          <div class="color-field">
+            <span>拍頭ドット</span>
+            <input id="beatDotColorInput" type="color" value="#d8662a">
+          </div>
+          <div class="color-field wide">
+            <span>拍頭ドットサイズ</span>
+            <select id="beatDotSizeInput">
+              <option value="1">標準</option>
+              <option value="1.45" selected>大</option>
+              <option value="1.8">特大</option>
+            </select>
+          </div>
         </div>
         <div class="source-actions">
           <button id="resetColorsBtn" type="button">色を戻す</button>
@@ -888,11 +949,17 @@
         </div>
         <div class="grid-mode">
           <select id="gridResolutionInput">
-            <option value="16">16分グリッド</option>
-            <option value="8">8分グリッド</option>
-            <option value="4">4分グリッド</option>
+            <option value="16">全拍16分</option>
+            <option value="8">全拍8分</option>
+            <option value="4">全拍4分</option>
           </select>
           <button id="fillGridDotsBtn" type="button">空で埋める</button>
+        </div>
+        <div class="beat-resolution">
+          <label>1拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
+          <label>2拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
+          <label>3拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
+          <label>4拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
         </div>
         <div class="grid16" id="grid16Inputs">
           <input class="grid-cell" type="text" placeholder="1">
@@ -982,6 +1049,7 @@
       "E#": 5, F: 5, "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11, Cb: 11
     };
     const flatPreferred = new Set(["F", "Bb", "Eb", "Ab", "Db", "Gb", "Cb"]);
+    const keyDisplayNames = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 
     const defaultChart = `Intro:
 | Edim7 | E | Edim7 | E |
@@ -1031,6 +1099,7 @@ Ending:
     const els = {
       targetKey: document.querySelector("#targetKey"),
       originalKeyInput: document.querySelector("#originalKeyInput"),
+      keyDetectResult: document.querySelector("#keyDetectResult"),
       originalKeyRead: document.querySelector("#originalKeyRead"),
       nowKey: document.querySelector("#nowKey"),
       songTitle: document.querySelector("#songTitle"),
@@ -1044,6 +1113,8 @@ Ending:
       lyricColorInput: document.querySelector("#lyricColorInput"),
       sectionColorInput: document.querySelector("#sectionColorInput"),
       rhythmColorInput: document.querySelector("#rhythmColorInput"),
+      beatDotColorInput: document.querySelector("#beatDotColorInput"),
+      beatDotSizeInput: document.querySelector("#beatDotSizeInput"),
       sectionBuilderInput: document.querySelector("#sectionBuilderInput"),
       barBuilderInput: document.querySelector("#barBuilderInput"),
       lyricBuilderInput: document.querySelector("#lyricBuilderInput"),
@@ -1054,6 +1125,7 @@ Ending:
       chordPreview: document.querySelector("#chordPreview"),
       commonChordButtons: document.querySelector("#commonChordButtons"),
       gridResolutionInput: document.querySelector("#gridResolutionInput"),
+      beatResolutionInputs: Array.from(document.querySelectorAll(".beatResolutionInput")),
       grid16Inputs: Array.from(document.querySelectorAll("#grid16Inputs input")),
       sourceInput: document.querySelector("#sourceInput"),
       sheetView: document.querySelector("#sheetView"),
@@ -1096,7 +1168,9 @@ Ending:
         chord: els.chordColorInput.value,
         lyric: els.lyricColorInput.value,
         section: els.sectionColorInput.value,
-        rhythm: els.rhythmColorInput.value
+        rhythm: els.rhythmColorInput.value,
+        beatDot: els.beatDotColorInput.value,
+        beatDotSize: els.beatDotSizeInput.value
       };
     }
 
@@ -1106,6 +1180,8 @@ Ending:
         lyric: "#243a68",
         section: "#052a70",
         rhythm: "#d8662a",
+        beatDot: "#d8662a",
+        beatDotSize: "1.45",
         ...colors
       };
       const root = document.documentElement;
@@ -1114,10 +1190,14 @@ Ending:
       root.style.setProperty("--lyric-color", nextColors.lyric);
       root.style.setProperty("--section-color", nextColors.section);
       root.style.setProperty("--rhythm-color", nextColors.rhythm);
+      root.style.setProperty("--beat-dot-color", nextColors.beatDot);
+      root.style.setProperty("--beat-dot-scale", nextColors.beatDotSize);
       els.chordColorInput.value = nextColors.chord;
       els.lyricColorInput.value = nextColors.lyric;
       els.sectionColorInput.value = nextColors.section;
       els.rhythmColorInput.value = nextColors.rhythm;
+      els.beatDotColorInput.value = nextColors.beatDot;
+      els.beatDotSizeInput.value = nextColors.beatDotSize;
     }
 
     function resetColors() {
@@ -1125,7 +1205,9 @@ Ending:
         chord: "#007c89",
         lyric: "#243a68",
         section: "#052a70",
-        rhythm: "#d8662a"
+        rhythm: "#d8662a",
+        beatDot: "#d8662a",
+        beatDotSize: "1.45"
       });
       update();
     }
@@ -1220,6 +1302,10 @@ Ending:
       return isChordToken(token) || isRhythmToken(token) || isGridToken(token);
     }
 
+    function isBeatGridIndex(tokenIndex, gridSize) {
+      return [4, 8, 16].includes(gridSize) && tokenIndex % (gridSize / 4) === 0;
+    }
+
     function isChordOnlyLine(line) {
       const tokens = line
         .replace(/:\|\||\|\|:|:|\|\||[,，]/g, " ")
@@ -1243,6 +1329,142 @@ Ending:
       const last = trimmed[trimmed.length - 1];
       const bracketed = (first === "[" && last === "]") || (first === "(" && last === ")");
       return bracketed || /^(Intro|Inter|Verse|A|B|C|D|Bridge|Chorus|Ending|Solo|Hook|Pre|Outro)\b/i.test(trimmed);
+    }
+
+    function parseChordForKey(token) {
+      const cleaned = token
+        .replace(/^[|:([{]+/, "")
+        .replace(/[|:,\])}]+$/g, "")
+        .trim();
+      const match = cleaned.match(/^([A-G](?:#|b)?)([^/\s|:]*)(?:\/([A-G](?:#|b)?))?$/);
+      if (!match) return null;
+      const quality = match[2] || "";
+      if (quality && !/^(mM|mMaj|m7b5|m|M|maj|Maj|dim|aug|sus|add|[0-9]|ø|\+)/.test(quality)) {
+        return null;
+      }
+      const rootIndex = noteIndex[match[1]];
+      if (rootIndex === undefined) return null;
+      return {
+        token: cleaned,
+        root: match[1],
+        rootIndex,
+        quality,
+        flavor: chordFlavor(quality)
+      };
+    }
+
+    function chordFlavor(quality = "") {
+      if (/dim|m7b5|ø/i.test(quality)) return "dim";
+      if (/aug|\+/i.test(quality)) return "aug";
+      if (/^m(?!aj|Maj|M)/.test(quality)) return "minor";
+      return "major";
+    }
+
+    function extractChordsForKey(text) {
+      const chords = [];
+      text.split(/\r?\n/).forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || /^[^|]+:\s*$/.test(trimmed) || /^[A-D](?:\s*[x×]\s*\d+)?$/i.test(trimmed)) {
+          return;
+        }
+        trimmed
+          .replace(/:\|\||\|\|:|\|/g, " ")
+          .split(/\s+/)
+          .map(parseChordForKey)
+          .filter(Boolean)
+          .forEach(chord => chords.push(chord));
+      });
+      return chords;
+    }
+
+    function scaleScore(mode, relativeRoot, flavor) {
+      const majorMap = {
+        0: { major: 5 },
+        2: { minor: 3.5 },
+        4: { minor: 3 },
+        5: { major: 3.5 },
+        7: { major: 4 },
+        9: { minor: 3.5 },
+        11: { dim: 2.5 }
+      };
+      const minorMap = {
+        0: { minor: 5 },
+        2: { dim: 2.5 },
+        3: { major: 3.5 },
+        5: { minor: 3 },
+        7: { minor: 2.5, major: 4 },
+        8: { major: 3.5 },
+        10: { major: 2.75 }
+      };
+      const match = (mode === "minor" ? minorMap : majorMap)[relativeRoot];
+      if (!match) return 0;
+      return (match[flavor] || 1.2) + 1;
+    }
+
+    function candidateKeyLabel(index, mode) {
+      return keyDisplayNames[mod(index, 12)] + (mode === "minor" ? "m" : "");
+    }
+
+    function detectKeyFromText(text) {
+      const chords = extractChordsForKey(text);
+      if (chords.length < 3) return null;
+
+      const candidates = [];
+      for (let tonic = 0; tonic < 12; tonic += 1) {
+        ["major", "minor"].forEach(mode => {
+          let score = 0;
+          chords.forEach((chord, index) => {
+            const relativeRoot = mod(chord.rootIndex - tonic, 12);
+            const weight = index === 0 ? 1.35 : index === chords.length - 1 ? 1.2 : 1;
+            score += scaleScore(mode, relativeRoot, chord.flavor) * weight;
+            if (relativeRoot === 0) score += mode === chord.flavor ? 2.4 : 1.1;
+            if (relativeRoot === 7) score += 0.8;
+          });
+
+          const first = chords[0];
+          const last = chords[chords.length - 1];
+          if (first.rootIndex === tonic) score += first.flavor === mode || (mode === "major" && first.flavor === "major") ? 7 : 3;
+          if (last.rootIndex === tonic) score += last.flavor === mode || (mode === "major" && last.flavor === "major") ? 5 : 2;
+
+          candidates.push({
+            key: candidateKeyLabel(tonic, mode),
+            mode,
+            score,
+            chords: chords.length
+          });
+        });
+      }
+
+      candidates.sort((a, b) => b.score - a.score);
+      return {
+        best: candidates[0],
+        candidates: candidates.slice(0, 3),
+        chords
+      };
+    }
+
+    function applyDetectedKey() {
+      const result = detectKeyFromText(els.sourceInput.value);
+      if (!result) {
+        els.keyDetectResult.textContent = "コードが少ないため推定できませんでした";
+        els.status.textContent = "コードを3つ以上含む譜面で試してください";
+        setTimeout(() => els.status.textContent = "", 2200);
+        return;
+      }
+
+      const detectedKey = result.best.key;
+      originalKey = detectedKey;
+      currentShift = 0;
+      els.originalKeyInput.value = detectedKey;
+      els.targetKey.value = detectedKey;
+      update();
+
+      const candidateText = result.candidates
+        .map(candidate => `${candidate.key}`)
+        .join(" / ");
+      els.keyDetectResult.textContent = `推定キー: ${detectedKey}（候補: ${candidateText}）`;
+      els.status.textContent = `${result.chords.length}個のコードから ${detectedKey} と推定しました`;
+      setTimeout(() => els.status.textContent = "", 2600);
     }
 
     function renderPlainLine(line, bars) {
@@ -1276,7 +1498,9 @@ Ending:
         const isChord = isChordToken(token);
         beat.textContent = isChord ? formatBeat(1 + (isGridBar ? tokenIndex : chordIndex) * beatStep) : "";
         const span = document.createElement("span");
-        span.className = isGridToken(token) ? "grid-dot" : (isChord ? "chord" : "rhythm-mark");
+        span.className = isGridToken(token)
+          ? `grid-dot${isGridBar && isBeatGridIndex(tokenIndex, tokens.length) ? " beat-grid-dot" : ""}`
+          : (isChord ? "chord" : "rhythm-mark");
         span.textContent = token;
         chip.append(beat, span);
         bar.appendChild(chip);
@@ -1285,14 +1509,14 @@ Ending:
       row.appendChild(bar);
     }
 
-    function appendSheetToken(lineEl, token) {
+    function appendSheetToken(lineEl, token, tokenIndex = -1, gridSize = 0) {
       const span = document.createElement("span");
       if (/^\|+$|^:\|\|$|^\|\|:$|^:?\|\|:?$/.test(token)) {
         span.className = "sheet-barline";
       } else if (isRhythmToken(token)) {
         span.className = "sheet-rhythm";
       } else if (isGridToken(token)) {
-        span.className = "sheet-grid-dot";
+        span.className = `sheet-grid-dot${isBeatGridIndex(tokenIndex, gridSize) ? " beat-grid-dot" : ""}`;
       } else if (isChordToken(token.replace(/:$/, ""))) {
         span.className = "sheet-chord";
       } else {
@@ -1333,12 +1557,24 @@ Ending:
         }
 
         if (line.includes("|") || isChordOnlyLine(line)) {
-          line.split(/(\s+|\|\|:|:\|\||\||:)/).filter(part => part !== "").forEach(part => {
-            if (/^\s+$/.test(part)) {
-              lineEl.appendChild(document.createTextNode(part));
-            } else {
-              appendSheetToken(lineEl, part);
+          line.split(/(\|\|:|:\|\||\|)/).filter(part => part !== "").forEach(chunk => {
+            if (/^\|\|:|:\|\||\|$/.test(chunk)) {
+              appendSheetToken(lineEl, chunk);
+              return;
             }
+
+            const tokenParts = chunk.split(/(\s+)/).filter(part => part !== "");
+            const musicalTokens = tokenParts.filter(part => !/^\s+$/.test(part));
+            const gridSize = [4, 8, 16].includes(musicalTokens.length) && musicalTokens.some(isGridToken) ? musicalTokens.length : 0;
+            let tokenIndex = 0;
+            tokenParts.forEach(part => {
+              if (/^\s+$/.test(part)) {
+                lineEl.appendChild(document.createTextNode(part));
+              } else {
+                appendSheetToken(lineEl, part, tokenIndex, gridSize);
+                tokenIndex += 1;
+              }
+            });
           });
         } else {
           const span = document.createElement("span");
@@ -1494,7 +1730,7 @@ Ending:
       if (activeGridInput) {
         activeGridInput.value = text;
         const index = els.grid16Inputs.indexOf(activeGridInput);
-        const next = els.grid16Inputs.slice(index + 1, currentGridSize()).find(input => !input.classList.contains("hidden"));
+        const next = els.grid16Inputs.slice(index + 1).find(input => !input.classList.contains("hidden"));
         if (next) {
           next.focus();
           activeGridInput = next;
@@ -1556,7 +1792,7 @@ Ending:
     }
 
     function gridBarText() {
-      const tokens = els.grid16Inputs.slice(0, currentGridSize()).map(input => input.value.trim() || ".");
+      const tokens = els.grid16Inputs.map(input => input.classList.contains("hidden") ? "." : (input.value.trim() || "."));
       return `| ${tokens.join(" ")} |`;
     }
 
@@ -1601,24 +1837,40 @@ Ending:
     }
 
     function fillGridDots() {
-      els.grid16Inputs.slice(0, currentGridSize()).forEach(input => {
+      els.grid16Inputs.filter(input => !input.classList.contains("hidden")).forEach(input => {
         input.value = ".";
       });
     }
 
-    function updateGridResolution() {
-      const labels = {
-        4: ["1", "2", "3", "4"],
-        8: ["1", "+", "2", "+", "3", "+", "4", "+"],
-        16: ["1", "e", "+", "a", "2", "e", "+", "a", "3", "e", "+", "a", "4", "e", "+", "a"]
-      };
-      const size = currentGridSize();
-      els.grid16Inputs.forEach((input, index) => {
-        input.classList.toggle("hidden", index >= size);
-        input.placeholder = labels[size][index] || "";
-        if (index >= size) input.value = "";
+    function beatSubdivision(beatIndex) {
+      return Number.parseInt(els.beatResolutionInputs[beatIndex]?.value, 10) || 4;
+    }
+
+    function isVisibleGridCell(index) {
+      const beatIndex = Math.floor(index / 4);
+      const position = index % 4;
+      const subdivision = beatSubdivision(beatIndex);
+      if (subdivision === 4) return true;
+      if (subdivision === 2) return position === 0 || position === 2;
+      return position === 0;
+    }
+
+    function setAllBeatSubdivisions(gridSize) {
+      const subdivision = gridSize === 4 ? 1 : gridSize === 8 ? 2 : 4;
+      els.beatResolutionInputs.forEach(select => {
+        select.value = String(subdivision);
       });
-      if (activeGridInput && els.grid16Inputs.indexOf(activeGridInput) >= size) {
+    }
+
+    function updateGridResolution() {
+      const labels = ["1", "e", "+", "a", "2", "e", "+", "a", "3", "e", "+", "a", "4", "e", "+", "a"];
+      els.grid16Inputs.forEach((input, index) => {
+        const visible = isVisibleGridCell(index);
+        input.classList.toggle("hidden", !visible);
+        input.placeholder = labels[index] || "";
+        if (!visible) input.value = "";
+      });
+      if (activeGridInput && activeGridInput.classList.contains("hidden")) {
         activeGridInput = els.grid16Inputs[0] || null;
       }
     }
@@ -1682,6 +1934,7 @@ Ending:
       els.targetKey.value = originalKey;
       update();
     });
+    document.querySelector("#detectKeyBtn").addEventListener("click", applyDetectedKey);
     els.targetKey.addEventListener("change", event => setTargetKey(event.target.value));
     els.originalKeyInput.addEventListener("change", event => {
       const currentTarget = els.targetKey.value;
@@ -1692,7 +1945,7 @@ Ending:
     els.titleInput.addEventListener("input", update);
     els.bpmInput.addEventListener("input", update);
     els.meterInput.addEventListener("change", update);
-    [els.chordColorInput, els.lyricColorInput, els.sectionColorInput, els.rhythmColorInput].forEach(input => {
+    [els.chordColorInput, els.lyricColorInput, els.sectionColorInput, els.rhythmColorInput, els.beatDotColorInput, els.beatDotSizeInput].forEach(input => {
       input.addEventListener("input", () => {
         applyColors();
         update();
@@ -1728,7 +1981,13 @@ Ending:
     });
     document.querySelector("#clearGridBtn").addEventListener("click", clearGrid);
     document.querySelector("#fillGridDotsBtn").addEventListener("click", fillGridDots);
-    els.gridResolutionInput.addEventListener("change", updateGridResolution);
+    els.gridResolutionInput.addEventListener("change", () => {
+      setAllBeatSubdivisions(currentGridSize());
+      updateGridResolution();
+    });
+    els.beatResolutionInputs.forEach(select => {
+      select.addEventListener("change", updateGridResolution);
+    });
     document.querySelector("#addStarterBtn").addEventListener("click", () => {
       insertIntoSource("Intro:\n| C | F | G | C |\n\nA:\n| C | G/B | Am | F |\nここに歌詞\n| C | G | F | C |\n\n");
     });
