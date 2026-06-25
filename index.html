@@ -390,6 +390,42 @@
       font-weight: 900;
     }
 
+    .grid16 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .grid-mode {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .grid-cell {
+      min-height: 36px;
+      padding: 6px;
+      text-align: center;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .grid-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .grid-dot,
+    .sheet-grid-dot {
+      color: rgba(13, 36, 102, .28);
+      font-weight: 900;
+    }
+
     button.primary,
     button.active {
       border-color: transparent;
@@ -850,6 +886,36 @@
           <button id="addRepeatBtn" type="button">繰返し</button>
           <button id="addStarterBtn" type="button">ひな形</button>
         </div>
+        <div class="grid-mode">
+          <select id="gridResolutionInput">
+            <option value="16">16分グリッド</option>
+            <option value="8">8分グリッド</option>
+            <option value="4">4分グリッド</option>
+          </select>
+          <button id="fillGridDotsBtn" type="button">空で埋める</button>
+        </div>
+        <div class="grid16" id="grid16Inputs">
+          <input class="grid-cell" type="text" placeholder="1">
+          <input class="grid-cell" type="text" placeholder="e">
+          <input class="grid-cell" type="text" placeholder="+">
+          <input class="grid-cell" type="text" placeholder="a">
+          <input class="grid-cell" type="text" placeholder="2">
+          <input class="grid-cell" type="text" placeholder="e">
+          <input class="grid-cell" type="text" placeholder="+">
+          <input class="grid-cell" type="text" placeholder="a">
+          <input class="grid-cell" type="text" placeholder="3">
+          <input class="grid-cell" type="text" placeholder="e">
+          <input class="grid-cell" type="text" placeholder="+">
+          <input class="grid-cell" type="text" placeholder="a">
+          <input class="grid-cell" type="text" placeholder="4">
+          <input class="grid-cell" type="text" placeholder="e">
+          <input class="grid-cell" type="text" placeholder="+">
+          <input class="grid-cell" type="text" placeholder="a">
+        </div>
+        <div class="grid-actions">
+          <button id="addGridBarBtn" type="button">グリッド小節</button>
+          <button id="clearGridBtn" type="button">グリッド消去</button>
+        </div>
         <div id="chordPicker" class="picker-panel">
           <div class="picker-controls">
             <select id="rootPicker"></select>
@@ -877,6 +943,7 @@
           <button id="undoSourceBtn" type="button">アンドゥ</button>
           <button id="clearSourceBtn" type="button">クリア</button>
           <button id="sampleSourceBtn" type="button">サンプル</button>
+          <button id="autoGridBtn" type="button">自動グリッド</button>
           <button id="pasteSourceBtn" type="button">貼り付け</button>
           <button id="copySourceBtn" type="button">コピー</button>
         </div>
@@ -986,6 +1053,7 @@ Ending:
       bassPicker: document.querySelector("#bassPicker"),
       chordPreview: document.querySelector("#chordPreview"),
       commonChordButtons: document.querySelector("#commonChordButtons"),
+      grid16Inputs: Array.from(document.querySelectorAll("#grid16Inputs input")),
       sourceInput: document.querySelector("#sourceInput"),
       sheetView: document.querySelector("#sheetView"),
       chartView: document.querySelector("#chartView"),
@@ -999,6 +1067,7 @@ Ending:
     let currentShift = 0;
     let sourceChart = defaultChart;
     const undoStack = [];
+    let activeGridInput = null;
 
     function saveState() {
       const state = {
@@ -1130,13 +1199,29 @@ Ending:
       return [">", "^", "-", "~"].includes(token);
     }
 
+    function isGridToken(token) {
+      return token === ".";
+    }
+
+    function isBarToken(token) {
+      return isChordToken(token) || isRhythmToken(token) || isGridToken(token);
+    }
+
     function isChordOnlyLine(line) {
       const tokens = line
         .replace(/:\|\||\|\|:|:|\|\||[,，]/g, " ")
         .trim()
         .split(/\s+/)
         .filter(Boolean);
-      return tokens.length > 0 && tokens.every(token => isChordToken(token) || isRhythmToken(token));
+      return tokens.length > 0 && tokens.every(isBarToken);
+    }
+
+    function barTokensFromLine(line) {
+      return line
+        .replace(/:\|\||\|\|:|:|\|\||[,，]/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
     }
 
     function isCueLine(line) {
@@ -1166,18 +1251,19 @@ Ending:
       bar.appendChild(number);
 
       const tokens = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
+      const isGridBar = tokens.length === 16 && tokens.some(isGridToken);
       const beatTokens = tokens.filter(token => isChordToken(token));
-      const beatStep = beatTokens.length ? beatsPerMeasure / beatTokens.length : beatsPerMeasure;
+      const beatStep = isGridBar ? beatsPerMeasure / 16 : (beatTokens.length ? beatsPerMeasure / beatTokens.length : beatsPerMeasure);
       let chordIndex = 0;
-      tokens.forEach(token => {
+      tokens.forEach((token, tokenIndex) => {
         const chip = document.createElement("span");
         chip.className = "chord-chip";
         const beat = document.createElement("span");
         beat.className = "beat-mark";
         const isChord = isChordToken(token);
-        beat.textContent = isChord ? formatBeat(1 + chordIndex * beatStep) : "";
+        beat.textContent = isChord ? formatBeat(1 + (isGridBar ? tokenIndex : chordIndex) * beatStep) : "";
         const span = document.createElement("span");
-        span.className = isChord ? "chord" : "rhythm-mark";
+        span.className = isGridToken(token) ? "grid-dot" : (isChord ? "chord" : "rhythm-mark");
         span.textContent = token;
         chip.append(beat, span);
         bar.appendChild(chip);
@@ -1192,6 +1278,8 @@ Ending:
         span.className = "sheet-barline";
       } else if (isRhythmToken(token)) {
         span.className = "sheet-rhythm";
+      } else if (isGridToken(token)) {
+        span.className = "sheet-grid-dot";
       } else if (isChordToken(token.replace(/:$/, ""))) {
         span.className = "sheet-chord";
       } else {
@@ -1390,6 +1478,16 @@ Ending:
     }
 
     function insertIntoBarInput(text) {
+      if (activeGridInput) {
+        activeGridInput.value = text;
+        const index = els.grid16Inputs.indexOf(activeGridInput);
+        const next = els.grid16Inputs[index + 1];
+        if (next) {
+          next.focus();
+          activeGridInput = next;
+        }
+        return;
+      }
       const input = els.barBuilderInput;
       const start = input.selectionStart ?? input.value.length;
       const end = input.selectionEnd ?? input.value.length;
@@ -1444,6 +1542,46 @@ Ending:
       updateChordPreview();
     }
 
+    function gridBarText() {
+      const tokens = els.grid16Inputs.map(input => input.value.trim() || ".");
+      return `| ${tokens.join(" ")} |`;
+    }
+
+    function tokensToGridBar(tokens) {
+      const grid = Array(16).fill(".");
+      const count = Math.min(tokens.length, 16);
+      tokens.slice(0, count).forEach((token, index) => {
+        const slot = Math.min(15, Math.floor(index * 16 / count));
+        grid[slot] = token;
+      });
+      return `| ${grid.join(" ")} |`;
+    }
+
+    function autoGridText(text) {
+      return text.split(/\r?\n/).map(line => {
+        if (!line.trim() || line.includes("|") || !isChordOnlyLine(line)) {
+          return line;
+        }
+        const tokens = barTokensFromLine(line);
+        if (tokens.length <= 16) {
+          return tokensToGridBar(tokens);
+        }
+        const bars = [];
+        for (let i = 0; i < tokens.length; i += 16) {
+          bars.push(tokensToGridBar(tokens.slice(i, i + 16)));
+        }
+        return bars.join("\n");
+      }).join("\n");
+    }
+
+    function clearGrid() {
+      els.grid16Inputs.forEach(input => {
+        input.value = "";
+      });
+      activeGridInput = els.grid16Inputs[0] || null;
+      if (activeGridInput) activeGridInput.focus();
+    }
+
     function fillKeySelect(select) {
       [...sharpKeys, "Bb", "Eb", "Ab", "Db", "Gb"].forEach(key => {
         const option = document.createElement("option");
@@ -1456,6 +1594,14 @@ Ending:
     fillKeySelect(els.targetKey);
     fillKeySelect(els.originalKeyInput);
     setupChordPicker();
+    els.grid16Inputs.forEach(input => {
+      input.addEventListener("focus", () => {
+        activeGridInput = input;
+      });
+    });
+    els.barBuilderInput.addEventListener("focus", () => {
+      activeGridInput = null;
+    });
 
     els.sourceInput.value = defaultChart;
     els.targetKey.value = originalKey;
@@ -1534,6 +1680,10 @@ Ending:
     document.querySelector("#addRepeatBtn").addEventListener("click", () => {
       insertIntoSource("||: C | F | G | C :||", { inline: true });
     });
+    document.querySelector("#addGridBarBtn").addEventListener("click", () => {
+      insertIntoSource(gridBarText(), { inline: true });
+    });
+    document.querySelector("#clearGridBtn").addEventListener("click", clearGrid);
     document.querySelector("#addStarterBtn").addEventListener("click", () => {
       insertIntoSource("Intro:\n| C | F | G | C |\n\nA:\n| C | G/B | Am | F |\nここに歌詞\n| C | G | F | C |\n\n");
     });
@@ -1556,6 +1706,11 @@ Ending:
       replaceSourceValue(defaultChart);
       els.status.textContent = "サンプルに戻しました";
       setTimeout(() => els.status.textContent = "", 1800);
+    });
+    document.querySelector("#autoGridBtn").addEventListener("click", () => {
+      replaceSourceValue(autoGridText(els.sourceInput.value));
+      els.status.textContent = "コード行を16分グリッドへ配置しました";
+      setTimeout(() => els.status.textContent = "", 2200);
     });
     document.querySelector("#pasteSourceBtn").addEventListener("click", async () => {
       try {
