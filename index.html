@@ -27,6 +27,10 @@
       --rhythm-color: #d8662a;
       --beat-dot-color: #d8662a;
       --beat-dot-scale: 1.45;
+      --beat-grid-chord-color: #45fff4;
+      --beat-grid-rhythm-color: #ffb347;
+      --beat-grid-lyric-color: #e8f2ff;
+      --beat-grid-dot-color: #6d778a;
       --shadow: 0 28px 80px rgba(0, 0, 0, .36);
       --radius: 8px;
       font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
@@ -864,20 +868,23 @@
     }
 
     .beat-grid-chord {
-      color: var(--chord-color);
+      color: var(--beat-grid-chord-color);
+      text-shadow: 0 0 12px color-mix(in srgb, var(--beat-grid-chord-color) 48%, transparent);
     }
 
     .beat-grid-rhythm {
-      color: var(--rhythm-color);
+      color: var(--beat-grid-rhythm-color);
+      text-shadow: 0 0 10px color-mix(in srgb, var(--beat-grid-rhythm-color) 34%, transparent);
     }
 
     .beat-grid-dot {
-      color: rgba(255, 255, 255, .18);
+      color: var(--beat-grid-dot-color);
+      opacity: .58;
     }
 
     .beat-grid-lyric {
       max-width: 760px;
-      color: #dce8ff;
+      color: var(--beat-grid-lyric-color);
       font-size: 17px;
       font-weight: 650;
       line-height: 1.7;
@@ -951,6 +958,67 @@
         padding: 16px;
         font-size: 14px;
         line-height: 1.8;
+      }
+    }
+
+    @media (min-width: 1100px) {
+      .app {
+        grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
+      }
+
+      main {
+        padding: 34px 42px;
+      }
+
+      .toolbar {
+        align-items: center;
+      }
+
+      .beat-grid-view {
+        padding: 24px;
+        overflow-x: visible;
+      }
+
+      .beat-grid-section {
+        gap: 16px;
+      }
+
+      .beat-grid-row {
+        flex-wrap: wrap;
+        gap: 18px;
+        min-width: 0;
+      }
+
+      .beat-grid-measure {
+        flex: 1 1 380px;
+        width: auto;
+        max-width: 520px;
+        min-height: 82px;
+      }
+
+      .beat-cell {
+        min-width: 0;
+        font-size: 25px;
+      }
+
+      .beat-slot {
+        min-width: 0;
+        font-size: 15px;
+      }
+
+      .beat-grid-lyric {
+        max-width: 980px;
+      }
+    }
+
+    @media (min-width: 1500px) {
+      .app {
+        grid-template-columns: 460px minmax(0, 1fr);
+      }
+
+      .beat-grid-measure {
+        flex-basis: 440px;
+        max-width: 620px;
       }
     }
 
@@ -1077,6 +1145,22 @@
           <div class="color-field">
             <span>記号</span>
             <input id="rhythmColorInput" type="color" value="#d8662a">
+          </div>
+          <div class="color-field">
+            <span>拍グリッドコード</span>
+            <input id="beatGridChordColorInput" type="color" value="#45fff4">
+          </div>
+          <div class="color-field">
+            <span>拍グリッド記号</span>
+            <input id="beatGridRhythmColorInput" type="color" value="#ffb347">
+          </div>
+          <div class="color-field">
+            <span>拍グリッド歌詞</span>
+            <input id="beatGridLyricColorInput" type="color" value="#e8f2ff">
+          </div>
+          <div class="color-field">
+            <span>拍グリッド空白</span>
+            <input id="beatGridDotColorInput" type="color" value="#6d778a">
           </div>
           <div class="color-field">
             <span>拍頭ドット</span>
@@ -1289,6 +1373,10 @@ Ending:
       lyricColorInput: document.querySelector("#lyricColorInput"),
       sectionColorInput: document.querySelector("#sectionColorInput"),
       rhythmColorInput: document.querySelector("#rhythmColorInput"),
+      beatGridChordColorInput: document.querySelector("#beatGridChordColorInput"),
+      beatGridRhythmColorInput: document.querySelector("#beatGridRhythmColorInput"),
+      beatGridLyricColorInput: document.querySelector("#beatGridLyricColorInput"),
+      beatGridDotColorInput: document.querySelector("#beatGridDotColorInput"),
       beatDotColorInput: document.querySelector("#beatDotColorInput"),
       beatDotSizeInput: document.querySelector("#beatDotSizeInput"),
       sectionBuilderInput: document.querySelector("#sectionBuilderInput"),
@@ -1350,6 +1438,10 @@ Ending:
         lyric: els.lyricColorInput.value,
         section: els.sectionColorInput.value,
         rhythm: els.rhythmColorInput.value,
+        beatGridChord: els.beatGridChordColorInput.value,
+        beatGridRhythm: els.beatGridRhythmColorInput.value,
+        beatGridLyric: els.beatGridLyricColorInput.value,
+        beatGridDot: els.beatGridDotColorInput.value,
         beatDot: els.beatDotColorInput.value,
         beatDotSize: els.beatDotSizeInput.value
       };
@@ -1361,6 +1453,10 @@ Ending:
         lyric: "#243a68",
         section: "#052a70",
         rhythm: "#d8662a",
+        beatGridChord: "#45fff4",
+        beatGridRhythm: "#ffb347",
+        beatGridLyric: "#e8f2ff",
+        beatGridDot: "#6d778a",
         beatDot: "#d8662a",
         beatDotSize: "1.45",
         ...colors
@@ -1371,12 +1467,20 @@ Ending:
       root.style.setProperty("--lyric-color", nextColors.lyric);
       root.style.setProperty("--section-color", nextColors.section);
       root.style.setProperty("--rhythm-color", nextColors.rhythm);
+      root.style.setProperty("--beat-grid-chord-color", nextColors.beatGridChord);
+      root.style.setProperty("--beat-grid-rhythm-color", nextColors.beatGridRhythm);
+      root.style.setProperty("--beat-grid-lyric-color", nextColors.beatGridLyric);
+      root.style.setProperty("--beat-grid-dot-color", nextColors.beatGridDot);
       root.style.setProperty("--beat-dot-color", nextColors.beatDot);
       root.style.setProperty("--beat-dot-scale", nextColors.beatDotSize);
       els.chordColorInput.value = nextColors.chord;
       els.lyricColorInput.value = nextColors.lyric;
       els.sectionColorInput.value = nextColors.section;
       els.rhythmColorInput.value = nextColors.rhythm;
+      els.beatGridChordColorInput.value = nextColors.beatGridChord;
+      els.beatGridRhythmColorInput.value = nextColors.beatGridRhythm;
+      els.beatGridLyricColorInput.value = nextColors.beatGridLyric;
+      els.beatGridDotColorInput.value = nextColors.beatGridDot;
       els.beatDotColorInput.value = nextColors.beatDot;
       els.beatDotSizeInput.value = nextColors.beatDotSize;
     }
@@ -1387,6 +1491,10 @@ Ending:
         lyric: "#243a68",
         section: "#052a70",
         rhythm: "#d8662a",
+        beatGridChord: "#45fff4",
+        beatGridRhythm: "#ffb347",
+        beatGridLyric: "#e8f2ff",
+        beatGridDot: "#6d778a",
         beatDot: "#d8662a",
         beatDotSize: "1.45"
       });
@@ -1807,6 +1915,22 @@ Ending:
       return isChordToken(token) ? "beat-grid-chord" : "beat-grid-dot";
     }
 
+    function visibleBeatSlots(tokensForBeat) {
+      const slots = Array.from({ length: 4 }, (_, index) => tokensForBeat[index] || ".");
+      const hasSecondHalf = !isGridToken(slots[2]) || !isGridToken(slots[3]);
+      const hasSixteenth = !isGridToken(slots[1]) || !isGridToken(slots[3]);
+
+      if (!hasSecondHalf && !hasSixteenth) {
+        return [slots[0]];
+      }
+
+      if (!hasSixteenth) {
+        return [slots[0], slots[2]];
+      }
+
+      return slots;
+    }
+
     function renderBeatGridMeasure(part, row, measureNumber, sourceLine = -1) {
       const measure = document.createElement("div");
       measure.className = "beat-grid-measure";
@@ -1845,7 +1969,8 @@ Ending:
         if (gridSize) {
           const subgrid = document.createElement("div");
           subgrid.className = "beat-subgrid";
-          const slots = Array.from({ length: gridSize / 4 }, (_, index) => tokensForBeat[index] || ".");
+          const slots = gridSize === 16 ? visibleBeatSlots(tokensForBeat) : Array.from({ length: gridSize / 4 }, (_, index) => tokensForBeat[index] || ".");
+          subgrid.style.gridTemplateColumns = `repeat(${slots.length}, 1fr)`;
           slots.forEach(token => {
             const slot = document.createElement("span");
             slot.className = `beat-slot ${tokenClassForBeatGrid(token)}`;
@@ -2340,7 +2465,18 @@ Ending:
     els.titleInput.addEventListener("input", update);
     els.bpmInput.addEventListener("input", update);
     els.meterInput.addEventListener("change", update);
-    [els.chordColorInput, els.lyricColorInput, els.sectionColorInput, els.rhythmColorInput, els.beatDotColorInput, els.beatDotSizeInput].forEach(input => {
+    [
+      els.chordColorInput,
+      els.lyricColorInput,
+      els.sectionColorInput,
+      els.rhythmColorInput,
+      els.beatGridChordColorInput,
+      els.beatGridRhythmColorInput,
+      els.beatGridLyricColorInput,
+      els.beatGridDotColorInput,
+      els.beatDotColorInput,
+      els.beatDotSizeInput
+    ].forEach(input => {
       input.addEventListener("input", () => {
         applyColors();
         update();
