@@ -300,7 +300,7 @@
     }
 
     .view-switch {
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
     }
 
     .key-detect {
@@ -760,6 +760,129 @@
       font-weight: 950;
     }
 
+    .beat-grid-view {
+      min-height: 540px;
+      padding: 18px;
+      background: #05070d;
+      overflow-x: auto;
+    }
+
+    .beat-grid-section {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .beat-grid-section-title {
+      color: #f5f7ff;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+
+    .beat-grid-row {
+      display: flex;
+      gap: 18px;
+      align-items: stretch;
+      min-width: max-content;
+    }
+
+    .beat-grid-measure {
+      position: relative;
+      width: 360px;
+      min-height: 72px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .14);
+      border-radius: 10px;
+      background: #252525;
+    }
+
+    .beat-grid-measure-number {
+      position: absolute;
+      top: 5px;
+      right: 8px;
+      z-index: 2;
+      color: rgba(255, 255, 255, .45);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .beat-cell {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 82px;
+      border-left: 2px solid #05070d;
+      color: #f8fbff;
+      font-size: 24px;
+      font-weight: 950;
+    }
+
+    .beat-cell:first-child {
+      border-left: 0;
+    }
+
+    .beat-cell-label {
+      position: absolute;
+      top: 5px;
+      left: 7px;
+      color: rgba(255, 255, 255, .34);
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .beat-cell-content {
+      display: grid;
+      place-items: center;
+      width: 100%;
+      min-height: 48px;
+      padding: 18px 5px 6px;
+      text-align: center;
+    }
+
+    .beat-subgrid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      width: 100%;
+      height: 100%;
+    }
+
+    .beat-slot {
+      display: grid;
+      place-items: center;
+      min-width: 20px;
+      border-left: 1px solid rgba(255, 255, 255, .14);
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+
+    .beat-slot:first-child {
+      border-left: 0;
+    }
+
+    .beat-grid-chord {
+      color: var(--chord-color);
+    }
+
+    .beat-grid-rhythm {
+      color: var(--rhythm-color);
+    }
+
+    .beat-grid-dot {
+      color: rgba(255, 255, 255, .18);
+    }
+
+    .beat-grid-lyric {
+      max-width: 760px;
+      color: #dce8ff;
+      font-size: 17px;
+      font-weight: 650;
+      line-height: 1.7;
+    }
+
     .status {
       min-height: 20px;
       margin-bottom: 10px;
@@ -905,6 +1028,7 @@
         <label>表示</label>
         <div class="view-switch">
           <button id="sheetBtn" class="active">譜面</button>
+          <button id="gridBtn">拍グリッド</button>
           <button id="chartBtn">カード</button>
           <button id="textBtn">テキスト</button>
         </div>
@@ -1084,6 +1208,7 @@
       <div class="status" id="status"></div>
       <div class="sheet">
         <pre id="sheetView" class="lead-sheet"></pre>
+        <div id="gridView" class="beat-grid-view hidden"></div>
         <div id="chartView" class="hidden"></div>
         <pre id="textView" class="plain hidden"></pre>
       </div>
@@ -1181,9 +1306,11 @@ Ending:
       sourceInput: document.querySelector("#sourceInput"),
       editingLineInfo: document.querySelector("#editingLineInfo"),
       sheetView: document.querySelector("#sheetView"),
+      gridView: document.querySelector("#gridView"),
       chartView: document.querySelector("#chartView"),
       textView: document.querySelector("#textView"),
       sheetBtn: document.querySelector("#sheetBtn"),
+      gridBtn: document.querySelector("#gridBtn"),
       chartBtn: document.querySelector("#chartBtn"),
       textBtn: document.querySelector("#textBtn"),
       status: document.querySelector("#status")
@@ -1674,6 +1801,132 @@ Ending:
       markActiveEditLine(els.sheetView);
     }
 
+    function tokenClassForBeatGrid(token) {
+      if (isGridToken(token)) return "beat-grid-dot";
+      if (isRhythmToken(token)) return "beat-grid-rhythm";
+      return isChordToken(token) ? "beat-grid-chord" : "beat-grid-dot";
+    }
+
+    function renderBeatGridMeasure(part, row, measureNumber, sourceLine = -1) {
+      const measure = document.createElement("div");
+      measure.className = "beat-grid-measure";
+      if (sourceLine >= 0) measure.dataset.sourceLine = sourceLine;
+
+      const number = document.createElement("span");
+      number.className = "beat-grid-measure-number";
+      number.textContent = measureNumber;
+      measure.appendChild(number);
+
+      const tokens = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
+      const gridSize = [4, 8, 16].includes(tokens.length) && tokens.some(isGridToken) ? tokens.length : 0;
+      const beatCells = Array.from({ length: 4 }, () => []);
+
+      if (gridSize) {
+        tokens.forEach((token, index) => {
+          beatCells[Math.min(3, Math.floor(index * 4 / gridSize))].push(token);
+        });
+      } else {
+        const musicalTokens = tokens.filter(isBarToken);
+        musicalTokens.forEach((token, index) => {
+          const beatIndex = Math.min(3, Math.floor(index * 4 / Math.max(1, musicalTokens.length)));
+          beatCells[beatIndex].push(token);
+        });
+      }
+
+      beatCells.forEach((tokensForBeat, beatIndex) => {
+        const cell = document.createElement("div");
+        cell.className = "beat-cell";
+        const label = document.createElement("span");
+        label.className = "beat-cell-label";
+        label.textContent = String(beatIndex + 1);
+        const content = document.createElement("div");
+        content.className = "beat-cell-content";
+
+        if (gridSize) {
+          const subgrid = document.createElement("div");
+          subgrid.className = "beat-subgrid";
+          const slots = Array.from({ length: gridSize / 4 }, (_, index) => tokensForBeat[index] || ".");
+          slots.forEach(token => {
+            const slot = document.createElement("span");
+            slot.className = `beat-slot ${tokenClassForBeatGrid(token)}`;
+            slot.textContent = token;
+            subgrid.appendChild(slot);
+          });
+          content.appendChild(subgrid);
+        } else {
+          const token = tokensForBeat.find(item => !isGridToken(item)) || "";
+          const span = document.createElement("span");
+          span.className = token ? tokenClassForBeatGrid(token) : "beat-grid-dot";
+          span.textContent = token;
+          content.appendChild(span);
+        }
+
+        cell.append(label, content);
+        measure.appendChild(cell);
+      });
+
+      row.appendChild(measure);
+    }
+
+    function renderBeatGrid(text) {
+      els.gridView.innerHTML = "";
+      let measureCounter = 0;
+
+      parseSections(text).forEach(section => {
+        const wrap = document.createElement("section");
+        wrap.className = "beat-grid-section";
+        const title = document.createElement("div");
+        title.className = "beat-grid-section-title";
+        title.textContent = section.name;
+        wrap.appendChild(title);
+
+        section.lines.forEach(({ text: line, lineNumber }) => {
+          if (!line.trim()) return;
+
+          if (!line.includes("|")) {
+            if (isChordOnlyLine(line)) {
+              const row = document.createElement("div");
+              row.className = "beat-grid-row";
+              measureCounter += 1;
+              renderBeatGridMeasure(line.trim(), row, measureCounter, lineNumber);
+              wrap.appendChild(row);
+              return;
+            }
+
+            const lyric = document.createElement("div");
+            lyric.className = "beat-grid-lyric";
+            lyric.dataset.sourceLine = lineNumber;
+            lyric.textContent = line.trim();
+            wrap.appendChild(lyric);
+            return;
+          }
+
+          const parts = line.split("|").map(part => part.trim()).filter(Boolean);
+          if (!parts.some(isChordOnlyLine)) {
+            const lyric = document.createElement("div");
+            lyric.className = "beat-grid-lyric";
+            lyric.dataset.sourceLine = lineNumber;
+            lyric.textContent = line.trim();
+            wrap.appendChild(lyric);
+            return;
+          }
+
+          const row = document.createElement("div");
+          row.className = "beat-grid-row";
+          parts.forEach(part => {
+            if (!isChordOnlyLine(part)) return;
+            measureCounter += 1;
+            renderBeatGridMeasure(part, row, measureCounter, lineNumber);
+          });
+          if (row.children.length) wrap.appendChild(row);
+        });
+
+        els.gridView.appendChild(wrap);
+      });
+
+      markActiveEditLine(els.gridView);
+    }
+
     function renderChart(text) {
       els.chartView.innerHTML = "";
       let measureCounter = 0;
@@ -1749,6 +2002,7 @@ Ending:
       els.songTitle.textContent = els.titleInput.value || "無題";
       els.metaLine.textContent = `キー ${targetKey} / BPM ${els.bpmInput.value || "122"} / ${els.meterInput.selectedOptions[0].textContent}`;
       renderSheet(output);
+      renderBeatGrid(output);
       els.textView.textContent = output;
       renderChart(output);
       updateEditingLineInfo();
@@ -2174,14 +2428,17 @@ Ending:
     });
     function setView(view) {
       els.sheetBtn.classList.toggle("active", view === "sheet");
+      els.gridBtn.classList.toggle("active", view === "grid");
       els.chartBtn.classList.toggle("active", view === "chart");
       els.textBtn.classList.toggle("active", view === "text");
       els.sheetView.classList.toggle("hidden", view !== "sheet");
+      els.gridView.classList.toggle("hidden", view !== "grid");
       els.chartView.classList.toggle("hidden", view !== "chart");
       els.textView.classList.toggle("hidden", view !== "text");
     }
 
     els.sheetBtn.addEventListener("click", () => setView("sheet"));
+    els.gridBtn.addEventListener("click", () => setView("grid"));
     els.chartBtn.addEventListener("click", () => setView("chart"));
     els.textBtn.addEventListener("click", () => setView("text"));
     document.querySelector("#copyBtn").addEventListener("click", async () => {
