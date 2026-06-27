@@ -613,6 +613,20 @@
       box-shadow: 0 0 0 5px rgba(40, 242, 238, .08);
     }
 
+    .sheet-line,
+    .bar,
+    .beat-grid-measure,
+    .beat-grid-lyric,
+    .beat-slot {
+      cursor: text;
+    }
+
+    .selected-edit-target {
+      outline: 3px solid rgba(255, 179, 71, .9);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 5px rgba(255, 179, 71, .14);
+    }
+
     .sheet-line.active-edit-line {
       border-radius: var(--radius);
       padding-inline: 6px;
@@ -861,10 +875,24 @@
       font-size: 14px;
       font-weight: 900;
       line-height: 1.1;
+      outline: 0;
+      user-select: text;
     }
 
     .beat-slot:first-child {
       border-left: 0;
+    }
+
+    .beat-cell-content > .beat-slot {
+      min-width: 42px;
+      border-left: 0;
+      padding: 2px 6px;
+    }
+
+    .beat-slot.selected-edit-target {
+      border-radius: 4px;
+      background: rgba(255, 179, 71, .18);
+      box-shadow: inset 0 0 0 2px rgba(255, 179, 71, .78), 0 0 16px rgba(255, 179, 71, .18);
     }
 
     .beat-grid-chord {
@@ -1409,6 +1437,7 @@ Ending:
     const undoStack = [];
     let activeGridInput = null;
     let activeSourceLine = 0;
+    let selectedGridEdit = null;
     let sourceEditArmed = true;
 
     function saveState() {
@@ -1612,6 +1641,54 @@ Ending:
         .filter(Boolean);
     }
 
+    function cleanBarPart(part) {
+      return part.replace(/:\|\||\|\|:|:|\|\|/g, "").trim();
+    }
+
+    function tokenForSource(token) {
+      const trimmed = token.trim() || ".";
+      if (!isChordToken(trimmed)) return trimmed;
+      return transposeChordToken(trimmed, -currentShift, prefersFlatsForTarget(originalKey));
+    }
+
+    function tokenForDisplay(token) {
+      if (!isChordToken(token)) return token;
+      const targetIndex = mod(keyIndex(originalKey) + currentShift, 12);
+      const targetKey = keyName(targetIndex, prefersFlatsForTarget(els.targetKey.value)) + keyMode(els.targetKey.value || originalKey);
+      return transposeChordToken(token, currentShift, prefersFlatsForTarget(targetKey));
+    }
+
+    function replaceChordPartInLine(line, partIndex, nextPart) {
+      if (!line.includes("|")) {
+        return partIndex === 0 ? nextPart.trim() : line;
+      }
+
+      const segments = line.split("|");
+      let chordPartIndex = 0;
+      for (let index = 0; index < segments.length; index += 1) {
+        const segment = segments[index];
+        if (!segment.trim() || !isChordOnlyLine(segment)) continue;
+        if (chordPartIndex === partIndex) {
+          const leadingSpace = segment.match(/^\s*/)?.[0] || " ";
+          const trailingSpace = segment.match(/\s*$/)?.[0] || " ";
+          const trimmed = segment.trim();
+          const prefix = trimmed.startsWith(":") ? ": " : "";
+          const suffix = trimmed.endsWith(":") ? " :" : "";
+          segments[index] = `${leadingSpace || " "}${prefix}${nextPart.trim()}${suffix}${trailingSpace || " "}`;
+          return segments.join("|");
+        }
+        chordPartIndex += 1;
+      }
+      return line;
+    }
+
+    function sourcePartTokens(line, partIndex) {
+      if (!line.includes("|")) return barTokensFromLine(line);
+      const parts = line.split("|").map(part => part.trim()).filter(Boolean);
+      const chordParts = parts.filter(isChordOnlyLine);
+      return barTokensFromLine(chordParts[partIndex] || "");
+    }
+
     function isCueLine(line) {
       const trimmed = line.trim();
       const first = trimmed[0];
@@ -1638,6 +1715,43 @@ Ending:
       });
     }
 
+    function markSelectedGridEdit(root = document) {
+      root.querySelectorAll(".selected-edit-target").forEach(node => {
+        node.classList.remove("selected-edit-target");
+      });
+      if (!selectedGridEdit) return;
+      const selector = [
+        `[data-source-line="${selectedGridEdit.sourceLine}"]`,
+        `[data-part-index="${selectedGridEdit.partIndex}"]`,
+        selectedGridEdit.tokenIndex >= 0 ? `[data-token-index="${selectedGridEdit.tokenIndex}"]` : `[data-token-index="-1"][data-edit-kind="measure"]`
+      ].filter(Boolean).join("");
+      root.querySelectorAll(selector).forEach(node => {
+        node.classList.add("selected-edit-target");
+      });
+    }
+
+    function lineStartOffset(lineIndex) {
+      const lines = els.sourceInput.value.split("\n");
+      let offset = 0;
+      for (let i = 0; i < Math.min(lineIndex, lines.length); i += 1) {
+        offset += lines[i].length + 1;
+      }
+      return offset;
+    }
+
+    function selectSourceLine(lineIndex, focusInput = true) {
+      const lines = els.sourceInput.value.split("\n");
+      const safeLine = Math.max(0, Math.min(lineIndex, lines.length - 1));
+      const start = lineStartOffset(safeLine);
+      const end = start + (lines[safeLine] || "").length;
+      activeSourceLine = safeLine;
+      sourceEditArmed = true;
+      activeGridInput = null;
+      if (focusInput) els.sourceInput.focus({ preventScroll: true });
+      els.sourceInput.setSelectionRange(start, end);
+      updateEditingLineInfo();
+    }
+
     function updateEditingLineInfo() {
       activeSourceLine = Math.max(0, cursorLineIndex());
       const text = currentInputLineText();
@@ -1647,6 +1761,7 @@ Ending:
       const selectionText = selected ? ` / ${selected}文字選択中` : "";
       els.editingLineInfo.querySelector("span").textContent = `${activeSourceLine + 1}行目${selectionText}${text ? `: ${text}` : ""}`;
       markActiveEditLine();
+      markSelectedGridEdit();
     }
 
     function parseChordForKey(token) {
@@ -1915,10 +2030,10 @@ Ending:
       return isChordToken(token) ? "beat-grid-chord" : "beat-grid-dot";
     }
 
-    function visibleBeatSlots(tokensForBeat) {
-      const slots = Array.from({ length: 4 }, (_, index) => tokensForBeat[index] || ".");
-      const hasSecondHalf = !isGridToken(slots[2]) || !isGridToken(slots[3]);
-      const hasSixteenth = !isGridToken(slots[1]) || !isGridToken(slots[3]);
+    function visibleBeatSlots(itemsForBeat) {
+      const slots = Array.from({ length: 4 }, (_, index) => itemsForBeat[index] || { token: ".", tokenIndex: index });
+      const hasSecondHalf = !isGridToken(slots[2].token) || !isGridToken(slots[3].token);
+      const hasSixteenth = !isGridToken(slots[1].token) || !isGridToken(slots[3].token);
 
       if (!hasSecondHalf && !hasSixteenth) {
         return [slots[0]];
@@ -1931,35 +2046,43 @@ Ending:
       return slots;
     }
 
-    function renderBeatGridMeasure(part, row, measureNumber, sourceLine = -1) {
+    function renderBeatGridMeasure(part, row, measureNumber, sourceLine = -1, partIndex = 0) {
       const measure = document.createElement("div");
       measure.className = "beat-grid-measure";
       if (sourceLine >= 0) measure.dataset.sourceLine = sourceLine;
+      measure.dataset.partIndex = partIndex;
+      measure.dataset.tokenIndex = -1;
+      measure.dataset.editKind = "measure";
 
       const number = document.createElement("span");
       number.className = "beat-grid-measure-number";
       number.textContent = measureNumber;
       measure.appendChild(number);
 
-      const tokens = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
+      const tokens = cleanBarPart(part).split(/\s+/).filter(Boolean);
       const gridSize = [4, 8, 16].includes(tokens.length) && tokens.some(isGridToken) ? tokens.length : 0;
       const beatCells = Array.from({ length: 4 }, () => []);
 
       if (gridSize) {
         tokens.forEach((token, index) => {
-          beatCells[Math.min(3, Math.floor(index * 4 / gridSize))].push(token);
+          beatCells[Math.min(3, Math.floor(index * 4 / gridSize))].push({ token, tokenIndex: index });
         });
       } else {
-        const musicalTokens = tokens.filter(isBarToken);
-        musicalTokens.forEach((token, index) => {
+        const musicalTokens = tokens
+          .map((token, tokenIndex) => ({ token, tokenIndex }))
+          .filter(item => isBarToken(item.token));
+        musicalTokens.forEach((item, index) => {
           const beatIndex = Math.min(3, Math.floor(index * 4 / Math.max(1, musicalTokens.length)));
-          beatCells[beatIndex].push(token);
+          beatCells[beatIndex].push(item);
         });
       }
 
-      beatCells.forEach((tokensForBeat, beatIndex) => {
+      beatCells.forEach((itemsForBeat, beatIndex) => {
         const cell = document.createElement("div");
         cell.className = "beat-cell";
+        cell.dataset.sourceLine = sourceLine;
+        cell.dataset.partIndex = partIndex;
+        cell.dataset.tokenIndex = itemsForBeat[0]?.tokenIndex ?? -1;
         const label = document.createElement("span");
         label.className = "beat-cell-label";
         label.textContent = String(beatIndex + 1);
@@ -1969,20 +2092,37 @@ Ending:
         if (gridSize) {
           const subgrid = document.createElement("div");
           subgrid.className = "beat-subgrid";
-          const slots = gridSize === 16 ? visibleBeatSlots(tokensForBeat) : Array.from({ length: gridSize / 4 }, (_, index) => tokensForBeat[index] || ".");
+          const slots = gridSize === 16
+            ? visibleBeatSlots(itemsForBeat)
+            : Array.from({ length: gridSize / 4 }, (_, index) => itemsForBeat[index] || { token: ".", tokenIndex: beatIndex * (gridSize / 4) + index });
           subgrid.style.gridTemplateColumns = `repeat(${slots.length}, 1fr)`;
-          slots.forEach(token => {
+          slots.forEach(item => {
             const slot = document.createElement("span");
-            slot.className = `beat-slot ${tokenClassForBeatGrid(token)}`;
-            slot.textContent = token;
+            slot.className = `beat-slot ${tokenClassForBeatGrid(item.token)}`;
+            slot.textContent = item.token;
+            slot.contentEditable = "true";
+            slot.spellcheck = false;
+            slot.dataset.sourceLine = sourceLine;
+            slot.dataset.partIndex = partIndex;
+            slot.dataset.tokenIndex = item.tokenIndex;
+            slot.dataset.editKind = "slot";
+            slot.title = "クリックして編集";
             subgrid.appendChild(slot);
           });
           content.appendChild(subgrid);
         } else {
-          const token = tokensForBeat.find(item => !isGridToken(item)) || "";
+          const item = itemsForBeat.find(entry => !isGridToken(entry.token)) || itemsForBeat[0] || { token: "", tokenIndex: -1 };
+          const token = item.token;
           const span = document.createElement("span");
-          span.className = token ? tokenClassForBeatGrid(token) : "beat-grid-dot";
+          span.className = `beat-slot ${token ? tokenClassForBeatGrid(token) : "beat-grid-dot"}`;
           span.textContent = token;
+          span.contentEditable = "true";
+          span.spellcheck = false;
+          span.dataset.sourceLine = sourceLine;
+          span.dataset.partIndex = partIndex;
+          span.dataset.tokenIndex = item.tokenIndex;
+          span.dataset.editKind = "slot";
+          span.title = "クリックして編集";
           content.appendChild(span);
         }
 
@@ -2013,7 +2153,7 @@ Ending:
               const row = document.createElement("div");
               row.className = "beat-grid-row";
               measureCounter += 1;
-              renderBeatGridMeasure(line.trim(), row, measureCounter, lineNumber);
+              renderBeatGridMeasure(line.trim(), row, measureCounter, lineNumber, 0);
               wrap.appendChild(row);
               return;
             }
@@ -2038,10 +2178,12 @@ Ending:
 
           const row = document.createElement("div");
           row.className = "beat-grid-row";
+          let partIndex = 0;
           parts.forEach(part => {
             if (!isChordOnlyLine(part)) return;
             measureCounter += 1;
-            renderBeatGridMeasure(part, row, measureCounter, lineNumber);
+            renderBeatGridMeasure(part, row, measureCounter, lineNumber, partIndex);
+            partIndex += 1;
           });
           if (row.children.length) wrap.appendChild(row);
         });
@@ -2210,6 +2352,76 @@ Ending:
       applySourceEdit();
     }
 
+    function setSelectedGridEditFromElement(element) {
+      const sourceLine = Number.parseInt(element.dataset.sourceLine, 10);
+      const partIndex = Number.parseInt(element.dataset.partIndex, 10);
+      const tokenIndex = Number.parseInt(element.dataset.tokenIndex, 10);
+      if (!Number.isInteger(sourceLine) || !Number.isInteger(partIndex)) return false;
+      selectedGridEdit = {
+        sourceLine,
+        partIndex,
+        tokenIndex: Number.isInteger(tokenIndex) ? tokenIndex : -1
+      };
+      selectSourceLine(sourceLine, false);
+      markSelectedGridEdit();
+      return true;
+    }
+
+    function fillGridEditorFromSelection() {
+      if (!selectedGridEdit) return;
+      const line = els.sourceInput.value.split("\n")[selectedGridEdit.sourceLine] || "";
+      const tokens = sourcePartTokens(line, selectedGridEdit.partIndex).map(tokenForDisplay);
+      els.grid16Inputs.forEach((input, index) => {
+        input.value = tokens[index] && tokens[index] !== "." ? tokens[index] : "";
+      });
+      const nextInput = selectedGridEdit.tokenIndex >= 0 ? els.grid16Inputs[selectedGridEdit.tokenIndex] : els.grid16Inputs[0];
+      if (nextInput && !nextInput.classList.contains("hidden")) {
+        activeGridInput = nextInput;
+      }
+    }
+
+    function replaceSelectedGridToken(nextToken) {
+      if (!selectedGridEdit || selectedGridEdit.tokenIndex < 0) return false;
+      const lines = els.sourceInput.value.split("\n");
+      const line = lines[selectedGridEdit.sourceLine] || "";
+      const tokens = sourcePartTokens(line, selectedGridEdit.partIndex);
+      while (tokens.length <= selectedGridEdit.tokenIndex) tokens.push(".");
+      tokens[selectedGridEdit.tokenIndex] = tokenForSource(nextToken);
+      rememberSource();
+      lines[selectedGridEdit.sourceLine] = replaceChordPartInLine(line, selectedGridEdit.partIndex, tokens.join(" "));
+      els.sourceInput.value = lines.join("\n");
+      applySourceEdit();
+      selectedGridEdit = { ...selectedGridEdit };
+      selectSourceLine(selectedGridEdit.sourceLine, false);
+      els.status.textContent = "選択した拍を更新しました";
+      setTimeout(() => els.status.textContent = "", 1400);
+      return true;
+    }
+
+    function replaceSelectedGridMeasureFromInputs() {
+      if (!selectedGridEdit) return false;
+      const lines = els.sourceInput.value.split("\n");
+      const line = lines[selectedGridEdit.sourceLine] || "";
+      const tokens = els.grid16Inputs.map(input => {
+        if (input.classList.contains("hidden")) return ".";
+        return tokenForSource(input.value.trim() || ".");
+      });
+      rememberSource();
+      lines[selectedGridEdit.sourceLine] = replaceChordPartInLine(line, selectedGridEdit.partIndex, tokens.join(" "));
+      els.sourceInput.value = lines.join("\n");
+      applySourceEdit();
+      selectSourceLine(selectedGridEdit.sourceLine, false);
+      els.status.textContent = "選択した小節を更新しました";
+      setTimeout(() => els.status.textContent = "", 1400);
+      return true;
+    }
+
+    function commitBeatSlotEdit(slot) {
+      if (!setSelectedGridEditFromElement(slot)) return;
+      const value = slot.textContent.trim() || ".";
+      replaceSelectedGridToken(value);
+    }
+
     function normalizeBarInput(value) {
       const trimmed = value.trim();
       if (!trimmed) return "| C | F | G | C |";
@@ -2244,6 +2456,9 @@ Ending:
     }
 
     function insertMusicalToken(text) {
+      if (selectedGridEdit && replaceSelectedGridToken(text)) {
+        return;
+      }
       if (sourceEditArmed || document.activeElement === els.sourceInput) {
         insertIntoSource(text, { inline: true });
       } else {
@@ -2413,13 +2628,78 @@ Ending:
       els.sourceInput.addEventListener(eventName, () => {
         sourceEditArmed = true;
         activeGridInput = null;
+        selectedGridEdit = null;
         updateEditingLineInfo();
       });
     });
     els.sourceInput.addEventListener("input", () => {
       sourceEditArmed = true;
+      selectedGridEdit = null;
       updateEditingLineInfo();
     });
+
+    els.sheetView.addEventListener("click", event => {
+      const target = event.target.closest("[data-source-line]");
+      if (!target) return;
+      selectedGridEdit = null;
+      selectSourceLine(Number.parseInt(target.dataset.sourceLine, 10));
+      els.status.textContent = "譜面から行を選択しました";
+      setTimeout(() => els.status.textContent = "", 1200);
+    });
+
+    els.chartView.addEventListener("click", event => {
+      const target = event.target.closest("[data-source-line]");
+      if (!target) return;
+      selectedGridEdit = null;
+      selectSourceLine(Number.parseInt(target.dataset.sourceLine, 10));
+      els.status.textContent = "譜面から行を選択しました";
+      setTimeout(() => els.status.textContent = "", 1200);
+    });
+
+    els.gridView.addEventListener("click", event => {
+      const slot = event.target.closest(".beat-slot");
+      const target = slot || event.target.closest(".beat-grid-measure, .beat-grid-lyric");
+      if (!target) return;
+      if (setSelectedGridEditFromElement(target)) {
+        sourceEditArmed = false;
+        fillGridEditorFromSelection();
+        els.status.textContent = slot ? "拍スロットを選択しました" : "小節を選択しました";
+      } else if (target.dataset.sourceLine !== undefined) {
+        selectedGridEdit = null;
+        selectSourceLine(Number.parseInt(target.dataset.sourceLine, 10));
+        els.status.textContent = "行を選択しました";
+      }
+      setTimeout(() => els.status.textContent = "", 1200);
+    });
+
+    els.gridView.addEventListener("keydown", event => {
+      const slot = event.target.closest(".beat-slot");
+      if (!slot) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        slot.blur();
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        update();
+      }
+    });
+
+    els.gridView.addEventListener("focus", event => {
+      const slot = event.target.closest(".beat-slot");
+      if (!slot) return;
+      setSelectedGridEditFromElement(slot);
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(slot);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }, true);
+
+    els.gridView.addEventListener("blur", event => {
+      const slot = event.target.closest(".beat-slot");
+      if (slot) commitBeatSlotEdit(slot);
+    }, true);
 
     const saved = loadState();
     if (saved) {
@@ -2508,6 +2788,7 @@ Ending:
       insertIntoSource("||: C | F | G | C :||", { inline: true });
     });
     document.querySelector("#addGridBarBtn").addEventListener("click", () => {
+      if (replaceSelectedGridMeasureFromInputs()) return;
       insertIntoSource(gridBarText(), { inline: true });
     });
     document.querySelector("#clearGridBtn").addEventListener("click", clearGrid);
