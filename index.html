@@ -2849,7 +2849,6 @@ Ending:
       const lines = els.sourceInput.value.split("\n");
       const line = lines[selectedGridEdit.sourceLine] || "";
       const tokens = els.grid16Inputs.map(input => {
-        if (input.classList.contains("hidden")) return ".";
         return tokenForSource(input.value.trim() || ".");
       });
       rememberSource();
@@ -2859,6 +2858,18 @@ Ending:
       selectSourceLine(selectedGridEdit.sourceLine, false);
       els.status.textContent = "選択した小節を更新しました";
       setTimeout(() => els.status.textContent = "", 1400);
+      return true;
+    }
+
+    function previewSelectedGridMeasureFromInputs() {
+      if (!selectedGridEdit) return false;
+      const lines = els.sourceInput.value.split("\n");
+      const line = lines[selectedGridEdit.sourceLine] || "";
+      const tokens = els.grid16Inputs.map(input => tokenForSource(input.value.trim() || "."));
+      lines[selectedGridEdit.sourceLine] = replaceChordPartInLine(line, selectedGridEdit.partIndex, tokens.join(" "));
+      els.sourceInput.value = lines.join("\n");
+      applySourceEdit();
+      selectSourceLine(selectedGridEdit.sourceLine, false);
       return true;
     }
 
@@ -2903,9 +2914,6 @@ Ending:
       if (activeGridInput) {
         activeGridInput.value = mergedGridPopupValue(text, activeGridInput.value);
         activeGridInput.dispatchEvent(new Event("input", { bubbles: true }));
-        if (selectedGridEdit) {
-          replaceSelectedGridMeasureFromInputs();
-        }
         const index = els.grid16Inputs.indexOf(activeGridInput);
         const next = els.grid16Inputs.slice(index + 1).find(input => !input.classList.contains("hidden"));
         if (next) {
@@ -2965,9 +2973,6 @@ Ending:
     function commitGridInputChange(input) {
       if (!input) return;
       input.dispatchEvent(new Event("input", { bubbles: true }));
-      if (selectedGridEdit) {
-        replaceSelectedGridMeasureFromInputs();
-      }
     }
 
     function applyGridSymbol(symbol) {
@@ -2995,13 +3000,9 @@ Ending:
 
     function setGridInputFromPopup(value) {
       if (!activeGridInput) return;
-      const shouldUpdateSelectedMeasure = Boolean(selectedGridEdit);
       const mergedValue = mergedGridPopupValue(value, activeGridInput.value);
       activeGridInput.value = mergedValue === "." ? "" : mergedValue;
       activeGridInput.dispatchEvent(new Event("input", { bubbles: true }));
-      if (shouldUpdateSelectedMeasure) {
-        replaceSelectedGridMeasureFromInputs();
-      }
       const index = els.grid16Inputs.indexOf(activeGridInput);
       const next = els.grid16Inputs.slice(index + 1).find(input => !input.classList.contains("hidden"));
       if (next) {
@@ -3198,7 +3199,7 @@ Ending:
     }
 
     function gridBarText() {
-      const tokens = els.grid16Inputs.map(input => input.classList.contains("hidden") ? "." : (input.value.trim() || "."));
+      const tokens = els.grid16Inputs.map(input => input.value.trim() || ".");
       return `| ${tokens.join(" ")} |`;
     }
 
@@ -3240,12 +3241,14 @@ Ending:
       });
       activeGridInput = els.grid16Inputs[0] || null;
       if (activeGridInput) activeGridInput.focus();
+      previewSelectedGridMeasureFromInputs();
     }
 
     function fillGridDots() {
       els.grid16Inputs.filter(input => !input.classList.contains("hidden")).forEach(input => {
         input.value = ".";
       });
+      previewSelectedGridMeasureFromInputs();
     }
 
     function beatSubdivision(beatIndex) {
@@ -3274,7 +3277,6 @@ Ending:
         const visible = isVisibleGridCell(index);
         input.classList.toggle("hidden", !visible);
         input.placeholder = labels[index] || "";
-        if (!visible) input.value = "";
       });
       if (activeGridInput && activeGridInput.classList.contains("hidden")) {
         activeGridInput = els.grid16Inputs[0] || null;
@@ -3305,6 +3307,11 @@ Ending:
       });
       input.addEventListener("focus", () => {
         openGridChordPopup(input);
+      });
+      input.addEventListener("input", () => {
+        activeGridInput = input;
+        sourceEditArmed = false;
+        previewSelectedGridMeasureFromInputs();
       });
     });
     els.gridSymbolButtons.forEach(button => {
@@ -3501,9 +3508,13 @@ Ending:
     els.gridResolutionInput.addEventListener("change", () => {
       setAllBeatSubdivisions(currentGridSize());
       updateGridResolution();
+      previewSelectedGridMeasureFromInputs();
     });
     els.beatResolutionInputs.forEach(select => {
-      select.addEventListener("change", updateGridResolution);
+      select.addEventListener("change", () => {
+        updateGridResolution();
+        previewSelectedGridMeasureFromInputs();
+      });
     });
     document.querySelector("#addStarterBtn").addEventListener("click", () => {
       insertIntoSource("Intro:\n| C | F | G | C |\n\nA:\n| C | G/B | Am | F |\nここに歌詞\n| C | G | F | C |\n\n");
