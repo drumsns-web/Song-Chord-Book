@@ -663,8 +663,8 @@
       color: var(--beat-dot-color);
       display: inline-block;
       font-size: calc(1em * var(--beat-dot-scale));
-      line-height: .8;
-      transform: translateY(.03em);
+      line-height: 1;
+      transform: none;
     }
 
     .sheet-grid-dot .stacked-token {
@@ -673,6 +673,7 @@
 
     .sheet-grid-dot .token-rhythm {
       color: inherit;
+      transform: translateY(.08em);
     }
 
     button.primary,
@@ -1822,12 +1823,19 @@ Ending:
     }
 
     function rhythmPrefix(token) {
-      const match = String(token || "").match(/^([>^~⌒\-]+)(.+)$/);
+      const normalized = normalizeRhythmSymbols(token);
+      const match = normalized.match(/^([>^~⌒\-]+)(.+)$/);
       return match && isChordToken(match[2]) ? match[1] : "";
     }
 
+    function normalizeRhythmSymbols(symbol) {
+      return String(symbol || "")
+        .replace(/[~^]/g, "⌒")
+        .replace(/[‐‑‒–—−]/g, "-");
+    }
+
     function rhythmDisplayText(symbol) {
-      return String(symbol || "").replace(/[~^]/g, "⌒");
+      return normalizeRhythmSymbols(symbol);
     }
 
     function chordPartFromToken(token) {
@@ -1899,7 +1907,7 @@ Ending:
     }
 
     function isRhythmToken(token) {
-      return [">", "-", "⌒", "^", "~"].includes(token);
+      return /^[>^~⌒\-‐‑‒–—−]+$/.test(String(token || ""));
     }
 
     function isGridToken(token) {
@@ -1924,12 +1932,12 @@ Ending:
           return;
         }
         if (rhythmBuffer) {
-          normalized.push(...rhythmBuffer.split(""));
+          normalized.push(rhythmBuffer);
           rhythmBuffer = "";
         }
         normalized.push(token);
       });
-      if (rhythmBuffer) normalized.push(...rhythmBuffer.split(""));
+      if (rhythmBuffer) normalized.push(rhythmBuffer);
       return normalized;
     }
 
@@ -2839,7 +2847,7 @@ Ending:
     }
 
     function normalizeEditedGridToken(value) {
-      return value.replace(/・/g, ".").replace(/[~^]/g, "⌒").trim() || ".";
+      return normalizeRhythmSymbols(value.replace(/・/g, ".")).trim() || ".";
     }
 
     function commitBeatSlotEdit(slot) {
