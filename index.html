@@ -1818,25 +1818,48 @@ Ending:
       return isChordLikeToken(token) || isRhythmToken(token) || isGridToken(token);
     }
 
+    function normalizeStackedTokens(tokens) {
+      const normalized = [];
+      let rhythmBuffer = "";
+      tokens.forEach(token => {
+        if (isRhythmToken(token)) {
+          rhythmBuffer += token;
+          return;
+        }
+        if (rhythmBuffer && isChordLikeToken(token)) {
+          normalized.push(rhythmBuffer + token);
+          rhythmBuffer = "";
+          return;
+        }
+        if (rhythmBuffer) {
+          normalized.push(...rhythmBuffer.split(""));
+          rhythmBuffer = "";
+        }
+        normalized.push(token);
+      });
+      if (rhythmBuffer) normalized.push(...rhythmBuffer.split(""));
+      return normalized;
+    }
+
     function isBeatGridIndex(tokenIndex, gridSize) {
       return [4, 8, 16].includes(gridSize) && tokenIndex % (gridSize / 4) === 0;
     }
 
     function isChordOnlyLine(line) {
-      const tokens = line
+      const tokens = normalizeStackedTokens(line
         .replace(/:\|\||\|\|:|:|\|\||[,，]/g, " ")
         .trim()
         .split(/\s+/)
-        .filter(Boolean);
+        .filter(Boolean));
       return tokens.length > 0 && tokens.every(isBarToken);
     }
 
     function barTokensFromLine(line) {
-      return line
+      return normalizeStackedTokens(line
         .replace(/:\|\||\|\|:|:|\|\||[,，]/g, " ")
         .trim()
         .split(/\s+/)
-        .filter(Boolean);
+        .filter(Boolean));
     }
 
     function cleanBarPart(part) {
@@ -2157,7 +2180,7 @@ Ending:
       number.textContent = measureNumber;
       bar.appendChild(number);
 
-      const tokens = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
+      const tokens = normalizeStackedTokens(part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean));
       const isGridBar = [4, 8, 16].includes(tokens.length) && tokens.some(isGridToken);
       const beatTokens = tokens.filter(token => isChordLikeToken(token));
       const beatStep = isGridBar ? beatsPerMeasure / tokens.length : (beatTokens.length ? beatsPerMeasure / beatTokens.length : beatsPerMeasure);
@@ -2239,8 +2262,9 @@ Ending:
 
             const tokenParts = chunk.split(/(\s+)/).filter(part => part !== "");
             const musicalTokens = tokenParts.filter(part => !/^\s+$/.test(part));
-            const gridSize = [4, 8, 16].includes(musicalTokens.length) && musicalTokens.some(isGridToken) ? musicalTokens.length : 0;
-            const isMeasureChunk = musicalTokens.length > 0 && musicalTokens.every(isBarToken);
+            const displayTokens = normalizeStackedTokens(musicalTokens);
+            const gridSize = [4, 8, 16].includes(displayTokens.length) && displayTokens.some(isGridToken) ? displayTokens.length : 0;
+            const isMeasureChunk = displayTokens.length > 0 && displayTokens.every(isBarToken);
             const targetEl = isMeasureChunk ? document.createElement("span") : lineEl;
             if (isMeasureChunk) {
               targetEl.className = "sheet-measure";
@@ -2250,17 +2274,23 @@ Ending:
               targetEl.dataset.editKind = "measure";
             }
             let tokenIndex = 0;
-            tokenParts.forEach(part => {
-              if (/^\s+$/.test(part)) {
-                targetEl.appendChild(document.createTextNode(part));
-              } else {
+            if (isMeasureChunk) {
+              displayTokens.forEach((part, index) => {
+                if (index > 0) targetEl.appendChild(document.createTextNode(" "));
                 appendSheetToken(targetEl, part, tokenIndex, gridSize);
                 tokenIndex += 1;
-              }
-            });
-            if (isMeasureChunk) {
+              });
               lineEl.appendChild(targetEl);
               partIndex += 1;
+            } else {
+              tokenParts.forEach(part => {
+                if (/^\s+$/.test(part)) {
+                  targetEl.appendChild(document.createTextNode(part));
+                } else {
+                  appendSheetToken(targetEl, part, tokenIndex, gridSize);
+                  tokenIndex += 1;
+                }
+              });
             }
           });
         } else {
@@ -2310,7 +2340,7 @@ Ending:
       number.textContent = measureNumber;
       measure.appendChild(number);
 
-      const tokens = cleanBarPart(part).split(/\s+/).filter(Boolean);
+      const tokens = normalizeStackedTokens(cleanBarPart(part).split(/\s+/).filter(Boolean));
       const gridSize = [4, 8, 16].includes(tokens.length) && tokens.some(isGridToken) ? tokens.length : 0;
       const beatCells = Array.from({ length: 4 }, () => []);
 
