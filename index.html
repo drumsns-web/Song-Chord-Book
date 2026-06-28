@@ -444,9 +444,34 @@
 
     .grid16 {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: 42px repeat(4, minmax(0, 1fr));
       gap: 6px;
       margin-top: 10px;
+      align-items: stretch;
+    }
+
+    .grid-guide {
+      min-height: 24px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .grid-beat-label {
+      min-height: 36px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(40, 242, 238, .28);
+      border-radius: var(--radius);
+      color: var(--cyan-2);
+      background: rgba(40, 242, 238, .1);
+      font-size: 12px;
+      font-weight: 950;
+      line-height: 1.15;
+      text-align: center;
     }
 
     .grid-mode {
@@ -479,6 +504,29 @@
       text-align: center;
       font-family: "Cascadia Mono", Consolas, monospace;
       font-size: 12px;
+    }
+
+    .grid-cell.beat-head {
+      border-color: rgba(40, 242, 238, .38);
+      background: rgba(40, 242, 238, .09);
+    }
+
+    .grid16 .grid-cell.hidden {
+      display: block;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .grid-edit-mode {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border: 1px solid rgba(255, 179, 71, .26);
+      border-radius: var(--radius);
+      color: #ffe4b8;
+      background: rgba(255, 179, 71, .08);
+      font-size: 12px;
+      font-weight: 850;
+      line-height: 1.35;
     }
 
     .grid-actions {
@@ -1245,23 +1293,33 @@
           <label>4拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
         </div>
         <div class="grid16" id="grid16Inputs">
-          <input class="grid-cell" type="text" placeholder="1">
+          <span class="grid-guide"></span>
+          <span class="grid-guide">頭</span>
+          <span class="grid-guide">e</span>
+          <span class="grid-guide">裏</span>
+          <span class="grid-guide">a</span>
+          <span class="grid-beat-label">1拍</span>
+          <input class="grid-cell beat-head" type="text" placeholder="1">
           <input class="grid-cell" type="text" placeholder="e">
           <input class="grid-cell" type="text" placeholder="+">
           <input class="grid-cell" type="text" placeholder="a">
-          <input class="grid-cell" type="text" placeholder="2">
+          <span class="grid-beat-label">2拍</span>
+          <input class="grid-cell beat-head" type="text" placeholder="2">
           <input class="grid-cell" type="text" placeholder="e">
           <input class="grid-cell" type="text" placeholder="+">
           <input class="grid-cell" type="text" placeholder="a">
-          <input class="grid-cell" type="text" placeholder="3">
+          <span class="grid-beat-label">3拍</span>
+          <input class="grid-cell beat-head" type="text" placeholder="3">
           <input class="grid-cell" type="text" placeholder="e">
           <input class="grid-cell" type="text" placeholder="+">
           <input class="grid-cell" type="text" placeholder="a">
-          <input class="grid-cell" type="text" placeholder="4">
+          <span class="grid-beat-label">4拍</span>
+          <input class="grid-cell beat-head" type="text" placeholder="4">
           <input class="grid-cell" type="text" placeholder="e">
           <input class="grid-cell" type="text" placeholder="+">
           <input class="grid-cell" type="text" placeholder="a">
         </div>
+        <div class="grid-edit-mode" id="gridEditMode">未選択: グリッド小節を押すと新しい小節として追加します</div>
         <div class="grid-actions">
           <button id="addGridBarBtn" type="button">グリッド小節</button>
           <button id="clearGridBtn" type="button">グリッド消去</button>
@@ -1416,6 +1474,8 @@ Ending:
       bassPicker: document.querySelector("#bassPicker"),
       chordPreview: document.querySelector("#chordPreview"),
       commonChordButtons: document.querySelector("#commonChordButtons"),
+      addGridBarBtn: document.querySelector("#addGridBarBtn"),
+      gridEditMode: document.querySelector("#gridEditMode"),
       gridResolutionInput: document.querySelector("#gridResolutionInput"),
       beatResolutionInputs: Array.from(document.querySelectorAll(".beatResolutionInput")),
       grid16Inputs: Array.from(document.querySelectorAll("#grid16Inputs input")),
@@ -1719,6 +1779,7 @@ Ending:
       root.querySelectorAll(".selected-edit-target").forEach(node => {
         node.classList.remove("selected-edit-target");
       });
+      updateGridEditMode();
       if (!selectedGridEdit) return;
       const selector = [
         `[data-source-line="${selectedGridEdit.sourceLine}"]`,
@@ -1728,6 +1789,22 @@ Ending:
       root.querySelectorAll(selector).forEach(node => {
         node.classList.add("selected-edit-target");
       });
+    }
+
+    function updateGridEditMode() {
+      if (!els.gridEditMode || !els.addGridBarBtn) return;
+      if (selectedGridEdit) {
+        const target = selectedGridEdit.tokenIndex >= 0
+          ? `${selectedGridEdit.sourceLine + 1}行目 / ${selectedGridEdit.partIndex + 1}小節 / ${selectedGridEdit.tokenIndex + 1}番目`
+          : `${selectedGridEdit.sourceLine + 1}行目 / ${selectedGridEdit.partIndex + 1}小節`;
+        els.gridEditMode.textContent = `選択中: ${target} を変更します`;
+        els.addGridBarBtn.textContent = "選択小節を変更";
+        els.addGridBarBtn.classList.add("primary");
+      } else {
+        els.gridEditMode.textContent = "未選択: グリッド小節を押すと新しい小節として追加します";
+        els.addGridBarBtn.textContent = "グリッド小節を追加";
+        els.addGridBarBtn.classList.remove("primary");
+      }
     }
 
     function lineStartOffset(lineIndex) {
