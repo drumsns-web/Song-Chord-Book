@@ -842,9 +842,11 @@
     .stacked-token {
       display: inline-grid;
       place-items: center;
-      gap: 1px;
+      grid-template-rows: .86em 1.1em;
+      gap: 0;
       line-height: 1;
       vertical-align: middle;
+      min-height: 1.96em;
     }
 
     .stacked-token .token-rhythm {
@@ -852,6 +854,11 @@
       font-size: .72em;
       font-weight: 950;
       line-height: 1;
+      min-height: .86em;
+    }
+
+    .stacked-token .token-rhythm.empty {
+      visibility: hidden;
     }
 
     .stacked-token .token-chord {
@@ -889,7 +896,8 @@
     }
 
     .sheet-line {
-      min-height: 1.9em;
+      min-height: 2.35em;
+      margin-bottom: .18em;
     }
 
     .sheet-section {
@@ -2152,15 +2160,15 @@ Ending:
 
     function appendMusicalTokenContent(element, token) {
       const parts = splitMusicalToken(token);
-      if (!parts.rhythm || !parts.chord) {
+      if (!parts.chord) {
         element.textContent = token;
         return;
       }
       const wrap = document.createElement("span");
       wrap.className = "stacked-token";
       const rhythm = document.createElement("span");
-      rhythm.className = "token-rhythm";
-      rhythm.textContent = parts.rhythm;
+      rhythm.className = `token-rhythm${parts.rhythm ? "" : " empty"}`;
+      rhythm.textContent = parts.rhythm || "·";
       const chord = document.createElement("span");
       chord.className = "token-chord";
       chord.textContent = parts.chord;
