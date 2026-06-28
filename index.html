@@ -673,7 +673,6 @@
 
     .sheet-grid-dot .token-rhythm {
       color: inherit;
-      transform: translateY(.08em);
     }
 
     button.primary,
@@ -929,6 +928,23 @@
 
     .stacked-token .token-chord.empty {
       visibility: hidden;
+    }
+
+    .stacked-token.rhythm-over {
+      grid-template-rows: .86em 1.1em;
+    }
+
+    .stacked-token.rhythm-over .token-rhythm {
+      grid-row: 1;
+      transform: translateY(.08em);
+    }
+
+    .stacked-token.rhythm-over .token-chord {
+      grid-row: 2;
+    }
+
+    .stacked-token.rhythm-only .token-rhythm {
+      transform: translateY(-.18em);
     }
 
     .plain {
@@ -2253,7 +2269,7 @@ Ending:
     function appendMusicalTokenContent(element, token) {
       if (isGridToken(token) || isRhythmToken(token)) {
         const wrap = document.createElement("span");
-        wrap.className = "stacked-token";
+        wrap.className = "stacked-token rhythm-only";
         const chord = document.createElement("span");
         chord.className = "token-chord empty";
         chord.textContent = "";
@@ -2271,7 +2287,7 @@ Ending:
         return;
       }
       const wrap = document.createElement("span");
-      wrap.className = "stacked-token";
+      wrap.className = `stacked-token${parts.rhythm ? " rhythm-over" : ""}`;
       const rhythm = document.createElement("span");
       rhythm.className = `token-rhythm${parts.rhythm ? "" : " empty"}`;
       rhythm.textContent = parts.rhythm ? rhythmDisplayText(parts.rhythm) : "·";
