@@ -944,7 +944,21 @@
     }
 
     .stacked-token.rhythm-only .token-rhythm {
-      transform: translateY(-.18em);
+      transform: none;
+    }
+
+    .stacked-token.barline-token {
+      grid-template-rows: 1fr;
+      min-height: 1.96em;
+    }
+
+    .stacked-token.barline-token .token-barline {
+      grid-row: 1;
+      align-self: stretch;
+      display: inline-flex;
+      align-items: center;
+      color: inherit;
+      line-height: 1;
     }
 
     .plain {
@@ -2300,14 +2314,11 @@ Ending:
 
     function appendAlignedBarline(element, token) {
       const wrap = document.createElement("span");
-      wrap.className = "stacked-token";
-      const spacer = document.createElement("span");
-      spacer.className = "token-rhythm empty barline-spacer";
-      spacer.textContent = "·";
+      wrap.className = "stacked-token barline-token";
       const barline = document.createElement("span");
-      barline.className = "token-chord";
+      barline.className = "token-barline";
       barline.textContent = token;
-      wrap.append(spacer, barline);
+      wrap.appendChild(barline);
       element.appendChild(wrap);
     }
 
