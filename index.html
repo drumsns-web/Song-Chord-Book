@@ -930,6 +930,10 @@
       font-weight: 800;
     }
 
+    .sheet-barline .barline-spacer {
+      color: inherit;
+    }
+
     .sheet-rhythm {
       color: var(--rhythm-color);
       font-weight: 950;
@@ -2176,6 +2180,19 @@ Ending:
       element.appendChild(wrap);
     }
 
+    function appendAlignedBarline(element, token) {
+      const wrap = document.createElement("span");
+      wrap.className = "stacked-token";
+      const spacer = document.createElement("span");
+      spacer.className = "token-rhythm empty barline-spacer";
+      spacer.textContent = "·";
+      const barline = document.createElement("span");
+      barline.className = "token-chord";
+      barline.textContent = token;
+      wrap.append(spacer, barline);
+      element.appendChild(wrap);
+    }
+
     function renderBarFromChords(part, row, beatsPerMeasure, measureNumber, sourceLine = -1, partIndex = 0) {
       const bar = document.createElement("div");
       bar.className = part.includes(":") ? "bar repeat" : "bar";
@@ -2216,6 +2233,9 @@ Ending:
       const span = document.createElement("span");
       if (/^\|+$|^:\|\|$|^\|\|:$|^:?\|\|:?$/.test(token)) {
         span.className = "sheet-barline";
+        appendAlignedBarline(span, token);
+        lineEl.appendChild(span);
+        return;
       } else if (isRhythmToken(token)) {
         span.className = "sheet-rhythm";
       } else if (isGridToken(token)) {
