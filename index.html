@@ -424,12 +424,29 @@
       gap: 6px;
     }
 
+    .rhythm-buttons {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .picker-buttons button,
     .rhythm-buttons button {
       min-height: 34px;
       padding: 5px 6px;
       font-size: 12px;
       font-weight: 800;
+    }
+
+    .rhythm-buttons button {
+      display: grid;
+      gap: 2px;
+      min-height: 46px;
+      line-height: 1.15;
+    }
+
+    .rhythm-buttons button small {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 750;
     }
 
     .picker-preview {
@@ -496,6 +513,38 @@
       font-size: 11px;
       letter-spacing: 0;
       text-transform: none;
+    }
+
+    .grid-symbol-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .grid-symbol-row button {
+      min-height: 46px;
+      padding: 6px 5px;
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      border-color: rgba(40, 242, 238, .28);
+      background: rgba(40, 242, 238, .08);
+      color: var(--text);
+      line-height: 1.15;
+    }
+
+    .grid-symbol-row button strong {
+      color: var(--cyan);
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 15px;
+      font-weight: 950;
+    }
+
+    .grid-symbol-row button span {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 850;
     }
 
     .grid-cell {
@@ -616,6 +665,14 @@
       font-size: calc(1em * var(--beat-dot-scale));
       line-height: .8;
       transform: translateY(.03em);
+    }
+
+    .sheet-grid-dot .stacked-token {
+      color: inherit;
+    }
+
+    .sheet-grid-dot .token-rhythm {
+      color: inherit;
     }
 
     button.primary,
@@ -842,7 +899,7 @@
     .stacked-token {
       display: inline-grid;
       place-items: center;
-      grid-template-rows: .86em 1.1em;
+      grid-template-rows: 1.1em .86em;
       gap: 0;
       line-height: 1;
       vertical-align: middle;
@@ -850,6 +907,7 @@
     }
 
     .stacked-token .token-rhythm {
+      grid-row: 2;
       color: var(--rhythm-color);
       font-size: .72em;
       font-weight: 950;
@@ -862,9 +920,14 @@
     }
 
     .stacked-token .token-chord {
+      grid-row: 1;
       color: inherit;
       font-weight: inherit;
       line-height: 1.05;
+    }
+
+    .stacked-token .token-chord.empty {
+      visibility: hidden;
     }
 
     .plain {
@@ -1075,6 +1138,12 @@
     .beat-slot .stacked-token .token-chord {
       color: var(--beat-grid-chord-color);
       text-shadow: 0 0 12px color-mix(in srgb, var(--beat-grid-chord-color) 48%, transparent);
+    }
+
+    .beat-slot.beat-grid-dot .stacked-token .token-rhythm {
+      color: var(--beat-grid-dot-color);
+      opacity: .8;
+      text-shadow: none;
     }
 
     .beat-grid-dot {
@@ -1416,6 +1485,12 @@
           <label>3拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
           <label>4拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
         </div>
+        <div class="grid-symbol-row" aria-label="記号追加">
+          <button class="gridSymbolBtn" type="button" data-symbol=">"><strong>&gt;</strong><span>アクセント</span></button>
+          <button class="gridSymbolBtn" type="button" data-symbol="-"><strong>-</strong><span>伸ばし</span></button>
+          <button class="gridSymbolBtn" type="button" data-symbol="⌒"><strong>⌒</strong><span>食う・タイ</span></button>
+          <button id="clearGridSymbolBtn" type="button"><strong>なし</strong><span>記号だけ消す</span></button>
+        </div>
         <div class="grid16" id="grid16Inputs">
           <span class="grid-guide"></span>
           <span class="grid-guide">頭</span>
@@ -1460,10 +1535,9 @@
           </div>
           <div id="commonChordButtons" class="picker-buttons"></div>
           <div class="rhythm-buttons">
-            <button class="rhythmBtn" data-symbol=">">アクセント</button>
-            <button class="rhythmBtn" data-symbol="^">食う</button>
-            <button class="rhythmBtn" data-symbol="-">伸ばし</button>
-            <button class="rhythmBtn" data-symbol="~">タイ</button>
+            <button class="rhythmBtn" data-symbol=">"><span>&gt; アクセント</span><small>強く弾く</small></button>
+            <button class="rhythmBtn" data-symbol="-"><span>- 伸ばし</span><small>音を伸ばす</small></button>
+            <button class="rhythmBtn" data-symbol="⌒"><span>⌒ 食う・タイ</span><small>前に入ってつなぐ</small></button>
           </div>
         </div>
       </div>
@@ -1603,6 +1677,8 @@ Ending:
       gridResolutionInput: document.querySelector("#gridResolutionInput"),
       beatResolutionInputs: Array.from(document.querySelectorAll(".beatResolutionInput")),
       grid16Inputs: Array.from(document.querySelectorAll("#grid16Inputs input")),
+      gridSymbolButtons: Array.from(document.querySelectorAll(".gridSymbolBtn")),
+      clearGridSymbolBtn: document.querySelector("#clearGridSymbolBtn"),
       sourceInput: document.querySelector("#sourceInput"),
       editingLineInfo: document.querySelector("#editingLineInfo"),
       sheetView: document.querySelector("#sheetView"),
@@ -1746,8 +1822,12 @@ Ending:
     }
 
     function rhythmPrefix(token) {
-      const match = String(token || "").match(/^([>^~\-]+)(.+)$/);
+      const match = String(token || "").match(/^([>^~⌒\-]+)(.+)$/);
       return match && isChordToken(match[2]) ? match[1] : "";
+    }
+
+    function rhythmDisplayText(symbol) {
+      return String(symbol || "").replace(/[~^]/g, "⌒");
     }
 
     function chordPartFromToken(token) {
@@ -1819,7 +1899,7 @@ Ending:
     }
 
     function isRhythmToken(token) {
-      return [">", "^", "-", "~"].includes(token);
+      return [">", "-", "⌒", "^", "~"].includes(token);
     }
 
     function isGridToken(token) {
@@ -2163,6 +2243,20 @@ Ending:
     }
 
     function appendMusicalTokenContent(element, token) {
+      if (isGridToken(token) || isRhythmToken(token)) {
+        const wrap = document.createElement("span");
+        wrap.className = "stacked-token";
+        const chord = document.createElement("span");
+        chord.className = "token-chord empty";
+        chord.textContent = "";
+        const rhythm = document.createElement("span");
+        rhythm.className = "token-rhythm";
+        rhythm.textContent = isGridToken(token) ? "・" : rhythmDisplayText(token);
+        wrap.append(rhythm, chord);
+        element.appendChild(wrap);
+        return;
+      }
+
       const parts = splitMusicalToken(token);
       if (!parts.chord) {
         element.textContent = token;
@@ -2172,7 +2266,7 @@ Ending:
       wrap.className = "stacked-token";
       const rhythm = document.createElement("span");
       rhythm.className = `token-rhythm${parts.rhythm ? "" : " empty"}`;
-      rhythm.textContent = parts.rhythm || "·";
+      rhythm.textContent = parts.rhythm ? rhythmDisplayText(parts.rhythm) : "·";
       const chord = document.createElement("span");
       chord.className = "token-chord";
       chord.textContent = parts.chord;
@@ -2190,6 +2284,19 @@ Ending:
       barline.className = "token-chord";
       barline.textContent = token;
       wrap.append(spacer, barline);
+      element.appendChild(wrap);
+    }
+
+    function appendAlignedPlainToken(element, token) {
+      const wrap = document.createElement("span");
+      wrap.className = "stacked-token";
+      const spacer = document.createElement("span");
+      spacer.className = "token-chord empty";
+      spacer.textContent = "";
+      const body = document.createElement("span");
+      body.className = "token-rhythm";
+      body.textContent = isGridToken(token) ? "・" : rhythmDisplayText(token);
+      wrap.append(body, spacer);
       element.appendChild(wrap);
     }
 
@@ -2240,6 +2347,9 @@ Ending:
         span.className = "sheet-rhythm";
       } else if (isGridToken(token)) {
         span.className = `sheet-grid-dot${isBeatGridIndex(tokenIndex, gridSize) ? " beat-grid-dot" : ""}`;
+        appendAlignedPlainToken(span, token);
+        lineEl.appendChild(span);
+        return;
       } else if (isChordLikeToken(token.replace(/:$/, ""))) {
         span.className = "sheet-chord";
       } else {
@@ -2728,9 +2838,13 @@ Ending:
       return true;
     }
 
+    function normalizeEditedGridToken(value) {
+      return value.replace(/・/g, ".").replace(/[~^]/g, "⌒").trim() || ".";
+    }
+
     function commitBeatSlotEdit(slot) {
       if (!setSelectedGridEditFromElement(slot)) return;
-      const value = slot.textContent.trim() || ".";
+      const value = normalizeEditedGridToken(slot.textContent);
       replaceSelectedGridToken(value);
     }
 
@@ -2764,6 +2878,10 @@ Ending:
     function insertIntoBarInput(text) {
       if (activeGridInput) {
         activeGridInput.value = mergedGridPopupValue(text, activeGridInput.value);
+        activeGridInput.dispatchEvent(new Event("input", { bubbles: true }));
+        if (selectedGridEdit) {
+          replaceSelectedGridMeasureFromInputs();
+        }
         const index = els.grid16Inputs.indexOf(activeGridInput);
         const next = els.grid16Inputs.slice(index + 1).find(input => !input.classList.contains("hidden"));
         if (next) {
@@ -2808,6 +2926,47 @@ Ending:
         return prefix + value;
       }
       return value;
+    }
+
+    function visibleGridInputs() {
+      return els.grid16Inputs.filter(input => !input.classList.contains("hidden"));
+    }
+
+    function ensureActiveGridInput() {
+      if (activeGridInput && !activeGridInput.classList.contains("hidden")) return activeGridInput;
+      activeGridInput = visibleGridInputs()[0] || els.grid16Inputs[0] || null;
+      return activeGridInput;
+    }
+
+    function commitGridInputChange(input) {
+      if (!input) return;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      if (selectedGridEdit) {
+        replaceSelectedGridMeasureFromInputs();
+      }
+    }
+
+    function applyGridSymbol(symbol) {
+      const input = ensureActiveGridInput();
+      if (!input) return;
+      activeGridInput = input;
+      input.value = mergedGridPopupValue(symbol, input.value);
+      commitGridInputChange(input);
+      closeGridChordPopup();
+      input.focus({ preventScroll: true });
+      input.select();
+    }
+
+    function clearGridSymbol() {
+      const input = ensureActiveGridInput();
+      if (!input) return;
+      activeGridInput = input;
+      const current = input.value.trim();
+      input.value = isRhythmToken(current) ? "" : chordPartFromToken(current);
+      commitGridInputChange(input);
+      closeGridChordPopup();
+      input.focus({ preventScroll: true });
+      input.select();
     }
 
     function setGridInputFromPopup(value) {
@@ -2931,7 +3090,6 @@ Ending:
       appendPopupSection(gridChordPopup, "オンコード", []);
       appendPopupSection(gridChordPopup, "よく使う", ["C", "Dm7", "Em7", "F", "G", "Am", "Bm7b5", "C7", "CM7", "Csus4", "Cadd9", "C/G", "F/A", "G/B", "D/F#"]);
       appendPopupSection(gridChordPopup, "ルート", ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"]);
-      appendPopupSection(gridChordPopup, "記号 / 空白", [[">", ">"], ["^", "^"], ["-", "-"], ["~", "~"], ["空", "."], ["消す", "", "muted-choice"]], "muted-choice");
       document.body.appendChild(gridChordPopup);
       return gridChordPopup;
     }
@@ -3125,10 +3283,21 @@ Ending:
         openGridChordPopup(input);
       });
     });
+    els.gridSymbolButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        sourceEditArmed = false;
+        applyGridSymbol(button.dataset.symbol);
+      });
+    });
+    els.clearGridSymbolBtn.addEventListener("click", () => {
+      sourceEditArmed = false;
+      clearGridSymbol();
+    });
     document.addEventListener("click", event => {
       if (!gridChordPopup || !gridChordPopup.classList.contains("open")) return;
       if (gridChordPopup.contains(event.target)) return;
       if (event.target.closest("#grid16Inputs input")) return;
+      if (event.target.closest(".grid-symbol-row")) return;
       closeGridChordPopup();
     });
     document.addEventListener("keydown", event => {
