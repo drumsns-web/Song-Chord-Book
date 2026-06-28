@@ -729,6 +729,7 @@
     }
 
     .sheet-line,
+    .sheet-measure,
     .bar,
     .beat-grid-measure,
     .beat-grid-lyric,
@@ -745,6 +746,18 @@
     .sheet-line.active-edit-line {
       border-radius: var(--radius);
       padding-inline: 6px;
+    }
+
+    .sheet-measure {
+      display: inline-block;
+      border-radius: 5px;
+      padding: 0 3px;
+      transition: background .14s ease, box-shadow .14s ease;
+    }
+
+    .sheet-measure:hover {
+      background: rgba(40, 242, 238, .1);
+      box-shadow: inset 0 -2px 0 rgba(40, 242, 238, .28);
     }
 
     .bar.active-edit-line,
@@ -824,6 +837,27 @@
       font-size: 17px;
       font-weight: 950;
       line-height: 1.18;
+    }
+
+    .stacked-token {
+      display: inline-grid;
+      place-items: center;
+      gap: 1px;
+      line-height: 1;
+      vertical-align: middle;
+    }
+
+    .stacked-token .token-rhythm {
+      color: var(--rhythm-color);
+      font-size: .72em;
+      font-weight: 950;
+      line-height: 1;
+    }
+
+    .stacked-token .token-chord {
+      color: inherit;
+      font-weight: inherit;
+      line-height: 1.05;
     }
 
     .plain {
@@ -1018,6 +1052,17 @@
     .beat-grid-rhythm {
       color: var(--beat-grid-rhythm-color);
       text-shadow: 0 0 10px color-mix(in srgb, var(--beat-grid-rhythm-color) 34%, transparent);
+    }
+
+    .beat-slot .stacked-token .token-rhythm {
+      color: var(--beat-grid-rhythm-color);
+      font-size: .76em;
+      text-shadow: 0 0 10px color-mix(in srgb, var(--beat-grid-rhythm-color) 34%, transparent);
+    }
+
+    .beat-slot .stacked-token .token-chord {
+      color: var(--beat-grid-chord-color);
+      text-shadow: 0 0 12px color-mix(in srgb, var(--beat-grid-chord-color) 48%, transparent);
     }
 
     .beat-grid-dot {
@@ -1688,12 +1733,37 @@ Ending:
       return keyName(index + shift, preferFlats);
     }
 
+    function rhythmPrefix(token) {
+      const match = String(token || "").match(/^([>^~\-]+)(.+)$/);
+      return match && isChordToken(match[2]) ? match[1] : "";
+    }
+
+    function chordPartFromToken(token) {
+      const prefix = rhythmPrefix(token);
+      return prefix ? token.slice(prefix.length) : token;
+    }
+
+    function isChordLikeToken(token) {
+      return isChordToken(token) || Boolean(rhythmPrefix(token));
+    }
+
+    function splitMusicalToken(token) {
+      const prefix = rhythmPrefix(token);
+      return {
+        rhythm: prefix,
+        chord: prefix ? token.slice(prefix.length) : (isChordToken(token) ? token : "")
+      };
+    }
+
     function transposeChordToken(token, shift, preferFlats) {
-      return token.replace(/^([A-G](?:#|b)?)([^/\s|:]*)(?:\/([A-G](?:#|b)?))?$/, (_match, root, quality, bass) => {
+      const prefix = rhythmPrefix(token);
+      const chordToken = prefix ? token.slice(prefix.length) : token;
+      const transposed = chordToken.replace(/^([A-G](?:#|b)?)([^/\s|:]*)(?:\/([A-G](?:#|b)?))?$/, (_match, root, quality, bass) => {
         const nextRoot = transposeRoot(root, shift, preferFlats);
         const nextBass = bass ? "/" + transposeRoot(bass, shift, preferFlats) : "";
         return nextRoot + quality + nextBass;
       });
+      return prefix + transposed;
     }
 
     function transposeText(text, shift, preferFlats) {
@@ -1745,7 +1815,7 @@ Ending:
     }
 
     function isBarToken(token) {
-      return isChordToken(token) || isRhythmToken(token) || isGridToken(token);
+      return isChordLikeToken(token) || isRhythmToken(token) || isGridToken(token);
     }
 
     function isBeatGridIndex(tokenIndex, gridSize) {
@@ -1775,12 +1845,12 @@ Ending:
 
     function tokenForSource(token) {
       const trimmed = token.trim() || ".";
-      if (!isChordToken(trimmed)) return trimmed;
+      if (!isChordLikeToken(trimmed)) return trimmed;
       return transposeChordToken(trimmed, -currentShift, prefersFlatsForTarget(originalKey));
     }
 
     function tokenForDisplay(token) {
-      if (!isChordToken(token)) return token;
+      if (!isChordLikeToken(token)) return token;
       const targetIndex = mod(keyIndex(originalKey) + currentShift, 12);
       const targetKey = keyName(targetIndex, prefersFlatsForTarget(els.targetKey.value)) + keyMode(els.targetKey.value || originalKey);
       return transposeChordToken(token, currentShift, prefersFlatsForTarget(targetKey));
@@ -1914,7 +1984,8 @@ Ending:
         .replace(/^[|:([{]+/, "")
         .replace(/[|:,\])}]+$/g, "")
         .trim();
-      const match = cleaned.match(/^([A-G](?:#|b)?)([^/\s|:]*)(?:\/([A-G](?:#|b)?))?$/);
+      const chordToken = chordPartFromToken(cleaned);
+      const match = chordToken.match(/^([A-G](?:#|b)?)([^/\s|:]*)(?:\/([A-G](?:#|b)?))?$/);
       if (!match) return null;
       const quality = match[2] || "";
       if (quality && !/^(mM|mMaj|m7b5|m|M|maj|Maj|dim|aug|sus|add|[0-9]|ø|\+)/.test(quality)) {
@@ -1923,7 +1994,7 @@ Ending:
       const rootIndex = noteIndex[match[1]];
       if (rootIndex === undefined) return null;
       return {
-        token: cleaned,
+        token: chordToken,
         root: match[1],
         rootIndex,
         quality,
@@ -2056,10 +2127,31 @@ Ending:
       bars.appendChild(row);
     }
 
-    function renderBarFromChords(part, row, beatsPerMeasure, measureNumber, sourceLine = -1) {
+    function appendMusicalTokenContent(element, token) {
+      const parts = splitMusicalToken(token);
+      if (!parts.rhythm || !parts.chord) {
+        element.textContent = token;
+        return;
+      }
+      const wrap = document.createElement("span");
+      wrap.className = "stacked-token";
+      const rhythm = document.createElement("span");
+      rhythm.className = "token-rhythm";
+      rhythm.textContent = parts.rhythm;
+      const chord = document.createElement("span");
+      chord.className = "token-chord";
+      chord.textContent = parts.chord;
+      wrap.append(rhythm, chord);
+      element.appendChild(wrap);
+    }
+
+    function renderBarFromChords(part, row, beatsPerMeasure, measureNumber, sourceLine = -1, partIndex = 0) {
       const bar = document.createElement("div");
       bar.className = part.includes(":") ? "bar repeat" : "bar";
       if (sourceLine >= 0) bar.dataset.sourceLine = sourceLine;
+      bar.dataset.partIndex = partIndex;
+      bar.dataset.tokenIndex = -1;
+      bar.dataset.editKind = "measure";
       const number = document.createElement("span");
       number.className = "bar-number";
       number.textContent = measureNumber;
@@ -2067,7 +2159,7 @@ Ending:
 
       const tokens = part.replace(/:\|\||\|\|:|:|\|\|/g, "").split(/\s+/).filter(Boolean);
       const isGridBar = [4, 8, 16].includes(tokens.length) && tokens.some(isGridToken);
-      const beatTokens = tokens.filter(token => isChordToken(token));
+      const beatTokens = tokens.filter(token => isChordLikeToken(token));
       const beatStep = isGridBar ? beatsPerMeasure / tokens.length : (beatTokens.length ? beatsPerMeasure / beatTokens.length : beatsPerMeasure);
       let chordIndex = 0;
       tokens.forEach((token, tokenIndex) => {
@@ -2075,13 +2167,13 @@ Ending:
         chip.className = "chord-chip";
         const beat = document.createElement("span");
         beat.className = "beat-mark";
-        const isChord = isChordToken(token);
+        const isChord = isChordLikeToken(token);
         beat.textContent = isChord ? formatBeat(1 + (isGridBar ? tokenIndex : chordIndex) * beatStep) : "";
         const span = document.createElement("span");
         span.className = isGridToken(token)
           ? `grid-dot${isGridBar && isBeatGridIndex(tokenIndex, tokens.length) ? " beat-grid-dot" : ""}`
           : (isChord ? "chord" : "rhythm-mark");
-        span.textContent = token;
+        appendMusicalTokenContent(span, token);
         chip.append(beat, span);
         bar.appendChild(chip);
         if (isChord) chordIndex += 1;
@@ -2097,12 +2189,12 @@ Ending:
         span.className = "sheet-rhythm";
       } else if (isGridToken(token)) {
         span.className = `sheet-grid-dot${isBeatGridIndex(tokenIndex, gridSize) ? " beat-grid-dot" : ""}`;
-      } else if (isChordToken(token.replace(/:$/, ""))) {
+      } else if (isChordLikeToken(token.replace(/:$/, ""))) {
         span.className = "sheet-chord";
       } else {
         span.className = "sheet-lyric";
       }
-      span.textContent = token;
+      appendMusicalTokenContent(span, token);
       lineEl.appendChild(span);
     }
 
@@ -2138,6 +2230,7 @@ Ending:
         }
 
         if (line.includes("|") || isChordOnlyLine(line)) {
+          let partIndex = 0;
           line.split(/(\|\|:|:\|\||\|)/).filter(part => part !== "").forEach(chunk => {
             if (/^\|\|:|:\|\||\|$/.test(chunk)) {
               appendSheetToken(lineEl, chunk);
@@ -2147,15 +2240,28 @@ Ending:
             const tokenParts = chunk.split(/(\s+)/).filter(part => part !== "");
             const musicalTokens = tokenParts.filter(part => !/^\s+$/.test(part));
             const gridSize = [4, 8, 16].includes(musicalTokens.length) && musicalTokens.some(isGridToken) ? musicalTokens.length : 0;
+            const isMeasureChunk = musicalTokens.length > 0 && musicalTokens.every(isBarToken);
+            const targetEl = isMeasureChunk ? document.createElement("span") : lineEl;
+            if (isMeasureChunk) {
+              targetEl.className = "sheet-measure";
+              targetEl.dataset.sourceLine = lineIndex;
+              targetEl.dataset.partIndex = partIndex;
+              targetEl.dataset.tokenIndex = -1;
+              targetEl.dataset.editKind = "measure";
+            }
             let tokenIndex = 0;
             tokenParts.forEach(part => {
               if (/^\s+$/.test(part)) {
-                lineEl.appendChild(document.createTextNode(part));
+                targetEl.appendChild(document.createTextNode(part));
               } else {
-                appendSheetToken(lineEl, part, tokenIndex, gridSize);
+                appendSheetToken(targetEl, part, tokenIndex, gridSize);
                 tokenIndex += 1;
               }
             });
+            if (isMeasureChunk) {
+              lineEl.appendChild(targetEl);
+              partIndex += 1;
+            }
           });
         } else {
           const span = document.createElement("span");
@@ -2172,7 +2278,7 @@ Ending:
     function tokenClassForBeatGrid(token) {
       if (isGridToken(token)) return "beat-grid-dot";
       if (isRhythmToken(token)) return "beat-grid-rhythm";
-      return isChordToken(token) ? "beat-grid-chord" : "beat-grid-dot";
+      return isChordLikeToken(token) ? "beat-grid-chord" : "beat-grid-dot";
     }
 
     function visibleBeatSlots(itemsForBeat) {
@@ -2244,7 +2350,7 @@ Ending:
           slots.forEach(item => {
             const slot = document.createElement("span");
             slot.className = `beat-slot ${tokenClassForBeatGrid(item.token)}`;
-            slot.textContent = item.token;
+            appendMusicalTokenContent(slot, item.token);
             slot.contentEditable = "true";
             slot.spellcheck = false;
             slot.dataset.sourceLine = sourceLine;
@@ -2260,7 +2366,7 @@ Ending:
           const token = item.token;
           const span = document.createElement("span");
           span.className = `beat-slot ${token ? tokenClassForBeatGrid(token) : "beat-grid-dot"}`;
-          span.textContent = token;
+          appendMusicalTokenContent(span, token);
           span.contentEditable = "true";
           span.spellcheck = false;
           span.dataset.sourceLine = sourceLine;
@@ -2363,7 +2469,7 @@ Ending:
               const row = document.createElement("div");
               row.className = "bar-row";
               measureCounter += 1;
-              renderBarFromChords(line.trim(), row, beatsPerMeasure, measureCounter, sourceLine);
+              renderBarFromChords(line.trim(), row, beatsPerMeasure, measureCounter, sourceLine, 0);
               bars.appendChild(row);
               return;
             }
@@ -2380,13 +2486,15 @@ Ending:
 
           const row = document.createElement("div");
           row.className = "bar-row";
+          let partIndex = 0;
           parts.forEach(part => {
             if (!isChordOnlyLine(part)) {
               renderPlainLine(part, bars, sourceLine);
               return;
             }
             measureCounter += 1;
-            renderBarFromChords(part, row, beatsPerMeasure, measureCounter, sourceLine);
+            renderBarFromChords(part, row, beatsPerMeasure, measureCounter, sourceLine, partIndex);
+            partIndex += 1;
           });
           if (row.children.length) {
             bars.appendChild(row);
@@ -2531,7 +2639,8 @@ Ending:
       const line = lines[selectedGridEdit.sourceLine] || "";
       const tokens = sourcePartTokens(line, selectedGridEdit.partIndex);
       while (tokens.length <= selectedGridEdit.tokenIndex) tokens.push(".");
-      tokens[selectedGridEdit.tokenIndex] = tokenForSource(nextToken);
+      const currentDisplayToken = tokenForDisplay(tokens[selectedGridEdit.tokenIndex] || "");
+      tokens[selectedGridEdit.tokenIndex] = tokenForSource(mergedGridPopupValue(nextToken, currentDisplayToken));
       rememberSource();
       lines[selectedGridEdit.sourceLine] = replaceChordPartInLine(line, selectedGridEdit.partIndex, tokens.join(" "));
       els.sourceInput.value = lines.join("\n");
@@ -2567,6 +2676,24 @@ Ending:
       replaceSelectedGridToken(value);
     }
 
+    function selectEditableTarget(target, selectedMessage = "小節を選択しました", lineMessage = "行を選択しました") {
+      if (setSelectedGridEditFromElement(target)) {
+        sourceEditArmed = false;
+        fillGridEditorFromSelection();
+        els.status.textContent = selectedMessage;
+        setTimeout(() => els.status.textContent = "", 1200);
+        return true;
+      }
+      if (target.dataset.sourceLine !== undefined) {
+        selectedGridEdit = null;
+        selectSourceLine(Number.parseInt(target.dataset.sourceLine, 10));
+        els.status.textContent = lineMessage;
+        setTimeout(() => els.status.textContent = "", 1200);
+        return true;
+      }
+      return false;
+    }
+
     function normalizeBarInput(value) {
       const trimmed = value.trim();
       if (!trimmed) return "| C | F | G | C |";
@@ -2578,7 +2705,7 @@ Ending:
 
     function insertIntoBarInput(text) {
       if (activeGridInput) {
-        activeGridInput.value = text;
+        activeGridInput.value = mergedGridPopupValue(text, activeGridInput.value);
         const index = els.grid16Inputs.indexOf(activeGridInput);
         const next = els.grid16Inputs.slice(index + 1).find(input => !input.classList.contains("hidden"));
         if (next) {
@@ -2612,10 +2739,24 @@ Ending:
       if (gridChordPopup) gridChordPopup.classList.remove("open");
     }
 
+    function mergedGridPopupValue(value, currentValue) {
+      const current = currentValue.trim();
+      if (value === "." || value === "") return value;
+      if (isRhythmToken(value)) {
+        return isChordLikeToken(current) ? value + chordPartFromToken(current) : value;
+      }
+      if (isChordLikeToken(value)) {
+        const prefix = rhythmPrefix(current) || (isRhythmToken(current) ? current : "");
+        return prefix + value;
+      }
+      return value;
+    }
+
     function setGridInputFromPopup(value) {
       if (!activeGridInput) return;
       const shouldUpdateSelectedMeasure = Boolean(selectedGridEdit);
-      activeGridInput.value = value === "." ? "" : value;
+      const mergedValue = mergedGridPopupValue(value, activeGridInput.value);
+      activeGridInput.value = mergedValue === "." ? "" : mergedValue;
       activeGridInput.dispatchEvent(new Event("input", { bubbles: true }));
       if (shouldUpdateSelectedMeasure) {
         replaceSelectedGridMeasureFromInputs();
@@ -2967,37 +3108,22 @@ Ending:
     });
 
     els.sheetView.addEventListener("click", event => {
-      const target = event.target.closest("[data-source-line]");
+      const target = event.target.closest(".sheet-measure, [data-source-line]");
       if (!target) return;
-      selectedGridEdit = null;
-      selectSourceLine(Number.parseInt(target.dataset.sourceLine, 10));
-      els.status.textContent = "譜面から行を選択しました";
-      setTimeout(() => els.status.textContent = "", 1200);
+      selectEditableTarget(target, "譜面から小節を選択しました", "譜面から行を選択しました");
     });
 
     els.chartView.addEventListener("click", event => {
-      const target = event.target.closest("[data-source-line]");
+      const target = event.target.closest(".bar, .lyric-line, .cue-line, [data-source-line]");
       if (!target) return;
-      selectedGridEdit = null;
-      selectSourceLine(Number.parseInt(target.dataset.sourceLine, 10));
-      els.status.textContent = "譜面から行を選択しました";
-      setTimeout(() => els.status.textContent = "", 1200);
+      selectEditableTarget(target, "カードから小節を選択しました", "カードから行を選択しました");
     });
 
     els.gridView.addEventListener("click", event => {
       const slot = event.target.closest(".beat-slot");
       const target = slot || event.target.closest(".beat-grid-measure, .beat-grid-lyric");
       if (!target) return;
-      if (setSelectedGridEditFromElement(target)) {
-        sourceEditArmed = false;
-        fillGridEditorFromSelection();
-        els.status.textContent = slot ? "拍スロットを選択しました" : "小節を選択しました";
-      } else if (target.dataset.sourceLine !== undefined) {
-        selectedGridEdit = null;
-        selectSourceLine(Number.parseInt(target.dataset.sourceLine, 10));
-        els.status.textContent = "行を選択しました";
-      }
-      setTimeout(() => els.status.textContent = "", 1200);
+      selectEditableTarget(target, slot ? "拍スロットを選択しました" : "小節を選択しました", "行を選択しました");
     });
 
     els.gridView.addEventListener("keydown", event => {
