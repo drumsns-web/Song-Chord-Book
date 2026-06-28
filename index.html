@@ -529,6 +529,73 @@
       line-height: 1.35;
     }
 
+    .grid-chord-popup {
+      position: fixed;
+      z-index: 30;
+      display: none;
+      width: min(340px, calc(100vw - 24px));
+      max-height: min(430px, calc(100vh - 28px));
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid rgba(40, 242, 238, .34);
+      border-radius: var(--radius);
+      background: rgba(4, 10, 30, .97);
+      box-shadow: 0 22px 70px rgba(0, 0, 0, .48), 0 0 0 1px rgba(255, 255, 255, .08) inset;
+    }
+
+    .grid-chord-popup.open {
+      display: grid;
+      gap: 8px;
+    }
+
+    .grid-chord-popup-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--cyan-2);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .grid-chord-popup-close {
+      width: 30px;
+      min-height: 30px;
+      border-radius: 50%;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .grid-chord-popup-section {
+      display: grid;
+      gap: 5px;
+    }
+
+    .grid-chord-popup-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .grid-chord-popup-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 5px;
+    }
+
+    .grid-chord-popup-buttons button {
+      min-height: 32px;
+      padding: 4px 5px;
+      font-size: 12px;
+      font-weight: 900;
+      font-family: "Cascadia Mono", Consolas, monospace;
+    }
+
+    .grid-chord-popup-buttons button.muted-choice {
+      color: var(--muted);
+      font-family: inherit;
+    }
+
     .grid-actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1498,6 +1565,7 @@ Ending:
     let activeGridInput = null;
     let activeSourceLine = 0;
     let selectedGridEdit = null;
+    let gridChordPopup = null;
     let sourceEditArmed = true;
 
     function saveState() {
@@ -2532,6 +2600,170 @@ Ending:
       input.setSelectionRange(cursor, cursor);
     }
 
+    function gridInputLabel(input) {
+      const index = els.grid16Inputs.indexOf(input);
+      if (index < 0) return "grid";
+      const beat = Math.floor(index / 4) + 1;
+      const slot = ["1", "e", "+", "a"][index % 4];
+      return `beat ${beat} / ${slot}`;
+    }
+
+    function closeGridChordPopup() {
+      if (gridChordPopup) gridChordPopup.classList.remove("open");
+    }
+
+    function setGridInputFromPopup(value) {
+      if (!activeGridInput) return;
+      const shouldUpdateSelectedMeasure = Boolean(selectedGridEdit);
+      activeGridInput.value = value === "." ? "" : value;
+      activeGridInput.dispatchEvent(new Event("input", { bubbles: true }));
+      if (shouldUpdateSelectedMeasure) {
+        replaceSelectedGridMeasureFromInputs();
+      }
+      const index = els.grid16Inputs.indexOf(activeGridInput);
+      const next = els.grid16Inputs.slice(index + 1).find(input => !input.classList.contains("hidden"));
+      if (next) {
+        activeGridInput = next;
+        next.focus({ preventScroll: true });
+        openGridChordPopup(next);
+      } else {
+        closeGridChordPopup();
+        activeGridInput.focus({ preventScroll: true });
+        activeGridInput.select();
+      }
+    }
+
+    function targetKeyRootIndex() {
+      const targetIndex = mod(keyIndex(originalKey) + currentShift, 12);
+      return Number.isInteger(targetIndex) ? targetIndex : 0;
+    }
+
+    function currentKeyChordChoices() {
+      const preferFlats = prefersFlatsForTarget(els.targetKey.value || originalKey);
+      const tonic = targetKeyRootIndex();
+      const majorScale = [0, 2, 4, 5, 7, 9, 11];
+      const triads = ["", "m", "m", "", "", "m", "m7b5"];
+      const sevenths = ["M7", "m7", "m7", "M7", "7", "m7", "m7b5"];
+      return [
+        ...majorScale.map((step, index) => `${keyName(tonic + step, preferFlats)}${triads[index]}`),
+        ...majorScale.map((step, index) => `${keyName(tonic + step, preferFlats)}${sevenths[index]}`),
+        `${keyName(tonic, preferFlats)}sus4`,
+        `${keyName(tonic, preferFlats)}add9`
+      ];
+    }
+
+    function currentKeySlashChordChoices() {
+      const preferFlats = prefersFlatsForTarget(els.targetKey.value || originalKey);
+      const tonic = targetKeyRootIndex();
+      const note = offset => keyName(tonic + offset, preferFlats);
+      return [
+        `${note(0)}/${note(4)}`,
+        `${note(0)}/${note(7)}`,
+        `${note(5)}/${note(9)}`,
+        `${note(7)}/${note(11)}`,
+        `${note(9)}m/${note(7)}`,
+        `${note(2)}m/${note(5)}`,
+        `${note(4)}m/${note(7)}`,
+        `${note(7)}7/${note(11)}`,
+        `${note(0)}M7/${note(4)}`,
+        `${note(5)}M7/${note(9)}`,
+        `${note(2)}m7/${note(5)}`,
+        `${note(9)}m7/${note(0)}`
+      ];
+    }
+
+    function fillPopupSectionButtons(section, values, className = "") {
+      const buttons = section.querySelector(".grid-chord-popup-buttons");
+      buttons.innerHTML = "";
+      values.forEach(value => {
+        buttons.appendChild(Array.isArray(value)
+          ? createPopupButton(value[0], value[1], value[2] || className)
+          : createPopupButton(value, value, className));
+      });
+    }
+
+    function createPopupButton(label, value = label, className = "") {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      if (className) button.className = className;
+      button.addEventListener("click", () => setGridInputFromPopup(value));
+      return button;
+    }
+
+    function appendPopupSection(parent, label, values, className = "") {
+      const section = document.createElement("div");
+      section.className = "grid-chord-popup-section";
+      const title = document.createElement("div");
+      title.className = "grid-chord-popup-label";
+      title.textContent = label;
+      const buttons = document.createElement("div");
+      buttons.className = "grid-chord-popup-buttons";
+      section.dataset.popupSection = label;
+      values.forEach(value => {
+        buttons.appendChild(Array.isArray(value)
+          ? createPopupButton(value[0], value[1], value[2] || className)
+          : createPopupButton(value, value, className));
+      });
+      section.append(title, buttons);
+      parent.appendChild(section);
+    }
+
+    function ensureGridChordPopup() {
+      if (gridChordPopup) return gridChordPopup;
+      gridChordPopup = document.createElement("div");
+      gridChordPopup.className = "grid-chord-popup";
+      gridChordPopup.setAttribute("role", "dialog");
+
+      const head = document.createElement("div");
+      head.className = "grid-chord-popup-head";
+      const title = document.createElement("span");
+      title.dataset.popupTitle = "true";
+      title.textContent = "コードを選択";
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "grid-chord-popup-close";
+      close.textContent = "×";
+      close.addEventListener("click", closeGridChordPopup);
+      head.append(title, close);
+
+      gridChordPopup.appendChild(head);
+      appendPopupSection(gridChordPopup, "現在キー", []);
+      appendPopupSection(gridChordPopup, "オンコード", []);
+      appendPopupSection(gridChordPopup, "よく使う", ["C", "Dm7", "Em7", "F", "G", "Am", "Bm7b5", "C7", "CM7", "Csus4", "Cadd9", "C/G", "F/A", "G/B", "D/F#"]);
+      appendPopupSection(gridChordPopup, "ルート", ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"]);
+      appendPopupSection(gridChordPopup, "記号 / 空白", [[">", ">"], ["^", "^"], ["-", "-"], ["~", "~"], ["空", "."], ["消す", "", "muted-choice"]], "muted-choice");
+      document.body.appendChild(gridChordPopup);
+      return gridChordPopup;
+    }
+
+    function openGridChordPopup(input) {
+      if (!input || input.classList.contains("hidden")) return;
+      activeGridInput = input;
+      sourceEditArmed = false;
+      const popup = ensureGridChordPopup();
+      const title = popup.querySelector("[data-popup-title]");
+      if (title) title.textContent = `${gridInputLabel(input)} に入れるコード`;
+      const keySection = popup.querySelector('[data-popup-section="現在キー"]');
+      if (keySection) fillPopupSectionButtons(keySection, currentKeyChordChoices());
+      const slashSection = popup.querySelector('[data-popup-section="オンコード"]');
+      if (slashSection) fillPopupSectionButtons(slashSection, currentKeySlashChordChoices());
+      popup.classList.add("open");
+
+      const rect = input.getBoundingClientRect();
+      const width = Math.min(340, window.innerWidth - 24);
+      let left = Math.min(window.innerWidth - width - 12, Math.max(12, rect.left));
+      let top = rect.bottom + 8;
+      popup.style.width = `${width}px`;
+      popup.style.left = `${left}px`;
+      popup.style.top = `${top}px`;
+      const popupRect = popup.getBoundingClientRect();
+      if (popupRect.bottom > window.innerHeight - 12) {
+        top = Math.max(12, rect.top - popupRect.height - 8);
+        popup.style.top = `${top}px`;
+      }
+    }
+
     function insertMusicalToken(text) {
       if (selectedGridEdit && replaceSelectedGridToken(text)) {
         return;
@@ -2686,16 +2918,35 @@ Ending:
         activeGridInput = input;
         sourceEditArmed = false;
       });
+      input.addEventListener("click", event => {
+        event.stopPropagation();
+        openGridChordPopup(input);
+      });
+      input.addEventListener("focus", () => {
+        openGridChordPopup(input);
+      });
+    });
+    document.addEventListener("click", event => {
+      if (!gridChordPopup || !gridChordPopup.classList.contains("open")) return;
+      if (gridChordPopup.contains(event.target)) return;
+      if (event.target.closest("#grid16Inputs input")) return;
+      closeGridChordPopup();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") closeGridChordPopup();
     });
     els.barBuilderInput.addEventListener("focus", () => {
       activeGridInput = null;
       sourceEditArmed = false;
+      closeGridChordPopup();
     });
     els.lyricBuilderInput.addEventListener("focus", () => {
       sourceEditArmed = false;
+      closeGridChordPopup();
     });
     els.sectionBuilderInput.addEventListener("focus", () => {
       sourceEditArmed = false;
+      closeGridChordPopup();
     });
 
     els.sourceInput.value = defaultChart;
