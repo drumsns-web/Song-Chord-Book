@@ -93,6 +93,16 @@
       grid-template-columns: minmax(310px, 390px) minmax(0, 1fr);
     }
 
+    body.editor-collapsed .app,
+    body.projector-mode .app {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.editor-collapsed aside,
+    body.projector-mode aside {
+      display: none;
+    }
+
     aside {
       position: sticky;
       top: 0;
@@ -107,6 +117,10 @@
     main {
       min-width: 0;
       padding: 28px;
+    }
+
+    body.projector-mode main {
+      padding: clamp(16px, 2.2vw, 42px);
     }
 
     .brand {
@@ -384,6 +398,24 @@
       color: var(--muted);
       font-size: 12px;
       font-weight: 800;
+    }
+
+    .color-group-label {
+      grid-column: 1 / -1;
+      margin-top: 4px;
+      color: #dce9ff;
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .04em;
+    }
+
+    .color-field small {
+      display: block;
+      margin-top: 2px;
+      color: rgba(191, 209, 240, .72);
+      font-size: 10px;
+      font-weight: 750;
+      line-height: 1.25;
     }
 
     .color-field.wide {
@@ -738,6 +770,33 @@
 
     .auto-scroll-active .sheet {
       box-shadow: var(--shadow), 0 0 0 3px rgba(40, 242, 238, .32);
+    }
+
+    body.projector-mode .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      padding: 10px 0 14px;
+      background: linear-gradient(180deg, rgba(3, 10, 31, .96), rgba(3, 10, 31, .68), transparent);
+    }
+
+    body.projector-mode .lead-sheet {
+      min-height: calc(100vh - 150px);
+      padding: clamp(24px, 3vw, 54px);
+      font-size: clamp(18px, 1.65vw, 30px);
+      line-height: 2.05;
+    }
+
+    body.projector-mode .plain,
+    body.projector-mode .beat-grid-view {
+      min-height: calc(100vh - 150px);
+    }
+
+    body.projector-mode #copyBtn,
+    body.projector-mode #printBtn,
+    body.projector-mode #editModeBtn,
+    body.projector-mode #collapseEditorBtn {
+      display: none;
     }
 
     .sheet {
@@ -1495,44 +1554,47 @@
       <div class="control color-settings">
         <label>色設定</label>
         <div class="color-grid">
+          <div class="color-group-label">通常の譜面</div>
           <div class="color-field">
-            <span>コード</span>
+            <span>コード<small>白い譜面のコード名</small></span>
             <input id="chordColorInput" type="color" value="#007c89">
           </div>
           <div class="color-field">
-            <span>歌詞</span>
+            <span>歌詞<small>白い譜面の歌詞</small></span>
             <input id="lyricColorInput" type="color" value="#243a68">
           </div>
           <div class="color-field">
-            <span>見出し</span>
+            <span>見出し<small>Intro / A / B など</small></span>
             <input id="sectionColorInput" type="color" value="#052a70">
           </div>
           <div class="color-field">
-            <span>記号</span>
+            <span>記号<small>&gt; / ⌒ など</small></span>
             <input id="rhythmColorInput" type="color" value="#d8662a">
           </div>
+          <div class="color-group-label">拍グリッド譜面</div>
           <div class="color-field">
-            <span>拍グリッドコード</span>
+            <span>コード<small>黒い拍グリッド内</small></span>
             <input id="beatGridChordColorInput" type="color" value="#45fff4">
           </div>
           <div class="color-field">
-            <span>拍グリッド記号</span>
+            <span>記号<small>拍グリッド内の &gt; / ⌒</small></span>
             <input id="beatGridRhythmColorInput" type="color" value="#ffb347">
           </div>
           <div class="color-field">
-            <span>拍グリッド歌詞</span>
+            <span>歌詞<small>拍グリッド表示の歌詞</small></span>
             <input id="beatGridLyricColorInput" type="color" value="#e8f2ff">
           </div>
           <div class="color-field">
-            <span>拍グリッド空白</span>
+            <span>空白点<small>拍グリッド内の ・</small></span>
             <input id="beatGridDotColorInput" type="color" value="#6d778a">
           </div>
+          <div class="color-group-label">通常譜面の拍ドット</div>
           <div class="color-field">
-            <span>拍頭ドット</span>
+            <span>拍ドット<small>白い譜面の ・</small></span>
             <input id="beatDotColorInput" type="color" value="#d8662a">
           </div>
           <div class="color-field wide">
-            <span>拍頭ドットサイズ</span>
+            <span>拍ドットサイズ<small>白い譜面の ・ の大きさ</small></span>
             <select id="beatDotSizeInput">
               <option value="1">標準</option>
               <option value="1.45" selected>大</option>
@@ -1666,6 +1728,8 @@
         </div>
         <div class="actions">
           <button id="editModeBtn" type="button">編集</button>
+          <button id="collapseEditorBtn" type="button">編集欄を隠す</button>
+          <button id="projectorBtn" type="button">譜面全面</button>
           <button id="copyBtn">コピー</button>
           <button id="printBtn">印刷</button>
           <button id="autoScrollBtn" type="button">スクロール</button>
@@ -1784,6 +1848,8 @@ Ending:
       sourceInput: document.querySelector("#sourceInput"),
       editingLineInfo: document.querySelector("#editingLineInfo"),
       editModeBtn: document.querySelector("#editModeBtn"),
+      collapseEditorBtn: document.querySelector("#collapseEditorBtn"),
+      projectorBtn: document.querySelector("#projectorBtn"),
       autoScrollBtn: document.querySelector("#autoScrollBtn"),
       scrollSpeedInput: document.querySelector("#scrollSpeedInput"),
       sheetView: document.querySelector("#sheetView"),
@@ -1806,6 +1872,8 @@ Ending:
     let gridChordPopup = null;
     let sourceEditArmed = true;
     let editMode = false;
+    let editorCollapsed = false;
+    let projectorMode = false;
     let autoScrollRunning = false;
     let autoScrollFrame = null;
     let autoScrollLastTime = 0;
@@ -3673,12 +3741,13 @@ Ending:
       const deltaSeconds = Math.min(.08, (timestamp - autoScrollLastTime) / 1000);
       autoScrollLastTime = timestamp;
       const speed = Number.parseFloat(els.scrollSpeedInput.value) || 36;
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      if (window.scrollY >= maxScroll - 2) {
+      const scroller = document.scrollingElement || document.documentElement;
+      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+      if (scroller.scrollTop >= maxScroll - 2) {
         stopAutoScroll();
         return;
       }
-      window.scrollBy({ top: speed * deltaSeconds, left: 0, behavior: "auto" });
+      scroller.scrollTop += speed * deltaSeconds;
       autoScrollFrame = requestAnimationFrame(autoScrollStep);
     }
 
@@ -3723,6 +3792,39 @@ Ending:
       }
     }
 
+    function setEditorCollapsed(collapsed) {
+      editorCollapsed = collapsed;
+      document.body.classList.toggle("editor-collapsed", editorCollapsed);
+      els.collapseEditorBtn.classList.toggle("active", editorCollapsed);
+      els.collapseEditorBtn.textContent = editorCollapsed ? "編集欄を表示" : "編集欄を隠す";
+      if (editorCollapsed) setEditMode(false);
+    }
+
+    async function setProjectorMode(enabled) {
+      projectorMode = enabled;
+      document.body.classList.toggle("projector-mode", projectorMode);
+      els.projectorBtn.classList.toggle("active", projectorMode);
+      els.projectorBtn.textContent = projectorMode ? "全面解除" : "譜面全面";
+      if (projectorMode) {
+        setEditMode(false);
+        setEditorCollapsed(true);
+        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          try {
+            await document.documentElement.requestFullscreen();
+          } catch {
+            // Fullscreen can be blocked; the layout still switches to projector mode.
+          }
+        }
+      } else {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          try {
+            await document.exitFullscreen();
+          } catch {
+          }
+        }
+      }
+    }
+
     function shouldIgnoreSheetTap(target) {
       return Boolean(target.closest("button, input, select, textarea, label, .scroll-control"));
     }
@@ -3734,6 +3836,22 @@ Ending:
     els.editModeBtn.addEventListener("click", event => {
       event.stopPropagation();
       setEditMode(!editMode);
+    });
+    els.collapseEditorBtn.addEventListener("click", event => {
+      event.stopPropagation();
+      setEditorCollapsed(!editorCollapsed);
+    });
+    els.projectorBtn.addEventListener("click", event => {
+      event.stopPropagation();
+      setProjectorMode(!projectorMode);
+    });
+    document.addEventListener("fullscreenchange", () => {
+      if (!document.fullscreenElement && projectorMode) {
+        projectorMode = false;
+        document.body.classList.remove("projector-mode");
+        els.projectorBtn.classList.remove("active");
+        els.projectorBtn.textContent = "譜面全面";
+      }
     });
     els.autoScrollBtn.addEventListener("click", event => {
       event.stopPropagation();
