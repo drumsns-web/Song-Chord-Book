@@ -3854,7 +3854,7 @@ Ending:
       if (window.innerWidth <= 900) {
         return 4 + Math.pow(amount, 1.45) * 86;
       }
-      return 2 + Math.pow(amount, 1.25) * 34;
+      return 6 + amount * 114;
     }
 
     function autoScrollStep(timestamp) {
@@ -3864,12 +3864,19 @@ Ending:
       autoScrollLastTime = timestamp;
       const speed = currentScrollSpeed();
       const scroller = document.scrollingElement || document.documentElement;
-      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-      if (scroller.scrollTop >= maxScroll - 2) {
+      const maxScroll = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight,
+        scroller.scrollHeight
+      ) - window.innerHeight;
+      const currentTop = window.scrollY || scroller.scrollTop || document.body.scrollTop || 0;
+      if (currentTop >= maxScroll - 2) {
         stopAutoScroll();
         return;
       }
-      scroller.scrollTop += speed * deltaSeconds;
+      const nextTop = currentTop + speed * deltaSeconds;
+      window.scrollTo(0, nextTop);
+      scroller.scrollTop = nextTop;
       autoScrollFrame = requestAnimationFrame(autoScrollStep);
     }
 
