@@ -821,6 +821,15 @@
       accent-color: var(--cyan);
     }
 
+    .scroll-speed-value {
+      min-width: 92px;
+      color: var(--cyan-2);
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+      font-weight: 900;
+      text-align: right;
+    }
+
     .auto-scroll-active .sheet {
       box-shadow: var(--shadow), 0 0 0 3px rgba(40, 242, 238, .32);
     }
@@ -1790,6 +1799,7 @@
           <label class="scroll-control" for="scrollSpeedInput">
             速度
             <input id="scrollSpeedInput" type="range" min="0" max="200" step="1" value="70">
+            <span id="scrollSpeedValue" class="scroll-speed-value">70 / 37px/s</span>
           </label>
         </div>
       </div>
@@ -1911,6 +1921,7 @@ Ending:
       projectorBtn: document.querySelector("#projectorBtn"),
       autoScrollBtn: document.querySelector("#autoScrollBtn"),
       scrollSpeedInput: document.querySelector("#scrollSpeedInput"),
+      scrollSpeedValue: document.querySelector("#scrollSpeedValue"),
       sheetView: document.querySelector("#sheetView"),
       gridView: document.querySelector("#gridView"),
       chartView: document.querySelector("#chartView"),
@@ -3857,6 +3868,14 @@ Ending:
       return 18 + amount * 54;
     }
 
+    function updateScrollSpeedValue() {
+      if (!els.scrollSpeedValue) return;
+      const raw = Number.parseFloat(els.scrollSpeedInput.value) || 0;
+      const speed = currentScrollSpeed();
+      const mode = window.innerWidth <= 900 ? "SP" : "PC";
+      els.scrollSpeedValue.textContent = `${Math.round(raw)} / ${speed.toFixed(1)}px/s ${mode}`;
+    }
+
     function autoScrollStep(timestamp) {
       if (!autoScrollRunning) return;
       if (!autoScrollLastTime) autoScrollLastTime = timestamp;
@@ -3988,6 +4007,8 @@ Ending:
     });
     els.scrollSpeedInput.addEventListener("click", event => event.stopPropagation());
     els.scrollSpeedInput.addEventListener("pointerdown", event => event.stopPropagation());
+    els.scrollSpeedInput.addEventListener("input", updateScrollSpeedValue);
+    window.addEventListener("resize", updateScrollSpeedValue);
     const sheetPanel = document.querySelector(".sheet");
     sheetPanel.addEventListener("pointerdown", event => {
       if (editMode || shouldIgnoreSheetTap(event.target)) return;
@@ -4026,6 +4047,7 @@ Ending:
     });
     document.querySelector("#printBtn").addEventListener("click", () => window.print());
 
+    updateScrollSpeedValue();
     update();
   </script>
 </body>
