@@ -554,6 +554,21 @@
       margin-top: 10px;
     }
 
+    .symbol-mode-toggle {
+      width: 100%;
+      margin-top: 10px;
+      border-color: rgba(255, 179, 71, .32);
+      background: rgba(255, 179, 71, .08);
+      font-weight: 900;
+    }
+
+    .symbol-mode-toggle.active {
+      border-color: transparent;
+      background: linear-gradient(135deg, #ffb347, #ffe0a3);
+      color: #241400;
+      box-shadow: 0 0 22px rgba(255, 179, 71, .28);
+    }
+
     .grid-symbol-row button {
       min-height: 46px;
       padding: 6px 5px;
@@ -577,6 +592,44 @@
       color: var(--muted);
       font-size: 10px;
       font-weight: 850;
+    }
+
+    .grid-symbol-row button.active strong,
+    .grid-symbol-row button.active span {
+      color: #041733;
+    }
+
+    .undo-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      width: min(420px, calc(100vw - 28px));
+      padding: 10px 12px;
+      border: 1px solid rgba(40, 242, 238, .28);
+      border-radius: var(--radius);
+      background: rgba(4, 10, 30, .96);
+      box-shadow: 0 18px 54px rgba(0, 0, 0, .42);
+      transform: translateX(-50%);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .undo-toast.open {
+      display: flex;
+    }
+
+    .undo-toast span {
+      flex: 1;
+    }
+
+    .undo-toast button {
+      min-height: 34px;
+      padding: 5px 10px;
     }
 
     .grid-cell {
@@ -762,7 +815,7 @@
     }
 
     .scroll-control input {
-      width: 86px;
+      width: 220px;
       min-height: 0;
       padding: 0;
       accent-color: var(--cyan);
@@ -1643,6 +1696,7 @@
           <label>3拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
           <label>4拍<select class="beatResolutionInput"><option value="4">16分</option><option value="2">8分</option><option value="1">4分</option></select></label>
         </div>
+        <button id="symbolModeBtn" class="symbol-mode-toggle" type="button">記号入力: オフ</button>
         <div class="grid-symbol-row" aria-label="記号追加">
           <button class="gridSymbolBtn" type="button" data-symbol=">"><strong>&gt;</strong><span>アクセント</span></button>
           <button class="gridSymbolBtn" type="button" data-symbol="-"><strong>-</strong><span>伸ばし</span></button>
@@ -1735,7 +1789,7 @@
           <button id="autoScrollBtn" type="button">スクロール</button>
           <label class="scroll-control" for="scrollSpeedInput">
             速度
-            <input id="scrollSpeedInput" type="range" min="10" max="120" value="36">
+            <input id="scrollSpeedInput" type="range" min="0" max="100" step="1" value="38">
           </label>
         </div>
       </div>
@@ -1747,6 +1801,10 @@
         <pre id="textView" class="plain hidden"></pre>
       </div>
     </main>
+  </div>
+  <div id="undoToast" class="undo-toast" role="status" aria-live="polite">
+    <span>変更しました</span>
+    <button id="undoToastBtn" type="button">元に戻す</button>
   </div>
 
   <script>
@@ -1843,6 +1901,7 @@ Ending:
       gridResolutionInput: document.querySelector("#gridResolutionInput"),
       beatResolutionInputs: Array.from(document.querySelectorAll(".beatResolutionInput")),
       grid16Inputs: Array.from(document.querySelectorAll("#grid16Inputs input")),
+      symbolModeBtn: document.querySelector("#symbolModeBtn"),
       gridSymbolButtons: Array.from(document.querySelectorAll(".gridSymbolBtn")),
       clearGridSymbolBtn: document.querySelector("#clearGridSymbolBtn"),
       sourceInput: document.querySelector("#sourceInput"),
@@ -1860,6 +1919,8 @@ Ending:
       gridBtn: document.querySelector("#gridBtn"),
       chartBtn: document.querySelector("#chartBtn"),
       textBtn: document.querySelector("#textBtn"),
+      undoToast: document.querySelector("#undoToast"),
+      undoToastBtn: document.querySelector("#undoToastBtn"),
       status: document.querySelector("#status")
     };
 
@@ -1871,6 +1932,9 @@ Ending:
     let selectedGridEdit = null;
     let gridChordPopup = null;
     let sourceEditArmed = true;
+    let symbolInputMode = false;
+    let currentGridSymbol = ">";
+    let undoToastTimer = null;
     let editMode = false;
     let editorCollapsed = false;
     let projectorMode = false;
@@ -2916,6 +2980,16 @@ Ending:
       if (undoStack.length > 80) undoStack.shift();
     }
 
+    function showUndoToast(message = "変更しました") {
+      if (!els.undoToast || !els.undoToastBtn) return;
+      els.undoToast.querySelector("span").textContent = message;
+      els.undoToast.classList.add("open");
+      clearTimeout(undoToastTimer);
+      undoToastTimer = setTimeout(() => {
+        els.undoToast.classList.remove("open");
+      }, 4200);
+    }
+
     function undoSourceEdit() {
       if (!undoStack.length) {
         els.status.textContent = "戻せる編集がありません";
@@ -2924,6 +2998,7 @@ Ending:
       }
       els.sourceInput.value = undoStack.pop();
       applySourceEdit();
+      if (els.undoToast) els.undoToast.classList.remove("open");
       els.status.textContent = "ひとつ戻しました";
       setTimeout(() => els.status.textContent = "", 1800);
     }
@@ -2998,6 +3073,7 @@ Ending:
       applySourceEdit();
       selectedGridEdit = { ...selectedGridEdit };
       selectSourceLine(selectedGridEdit.sourceLine, false);
+      showUndoToast("コードを更新しました");
       els.status.textContent = "選択した拍を更新しました";
       setTimeout(() => els.status.textContent = "", 1400);
       return true;
@@ -3015,6 +3091,7 @@ Ending:
       els.sourceInput.value = lines.join("\n");
       applySourceEdit();
       selectSourceLine(selectedGridEdit.sourceLine, false);
+      showUndoToast("小節を更新しました");
       els.status.textContent = "選択した小節を更新しました";
       setTimeout(() => els.status.textContent = "", 1400);
       return true;
@@ -3022,13 +3099,18 @@ Ending:
 
     function previewSelectedGridMeasureFromInputs() {
       if (!selectedGridEdit) return false;
+      const previousValue = els.sourceInput.value;
       const lines = els.sourceInput.value.split("\n");
       const line = lines[selectedGridEdit.sourceLine] || "";
       const tokens = els.grid16Inputs.map(input => tokenForSource(input.value.trim() || "."));
       lines[selectedGridEdit.sourceLine] = replaceChordPartInLine(line, selectedGridEdit.partIndex, tokens.join(" "));
-      els.sourceInput.value = lines.join("\n");
+      const nextValue = lines.join("\n");
+      if (nextValue === previousValue) return false;
+      rememberSource(previousValue);
+      els.sourceInput.value = nextValue;
       applySourceEdit();
       selectSourceLine(selectedGridEdit.sourceLine, false);
+      showUndoToast("小節を更新しました");
       return true;
     }
 
@@ -3127,6 +3209,19 @@ Ending:
       if (activeGridInput && !activeGridInput.classList.contains("hidden")) return activeGridInput;
       activeGridInput = visibleGridInputs()[0] || els.grid16Inputs[0] || null;
       return activeGridInput;
+    }
+
+    function setSymbolInputMode(enabled, symbol = currentGridSymbol) {
+      symbolInputMode = enabled;
+      currentGridSymbol = symbol || currentGridSymbol || ">";
+      els.symbolModeBtn.classList.toggle("active", symbolInputMode);
+      els.symbolModeBtn.textContent = symbolInputMode
+        ? `記号入力: ${rhythmDisplayText(currentGridSymbol)}`
+        : "記号入力: オフ";
+      els.gridSymbolButtons.forEach(button => {
+        button.classList.toggle("active", symbolInputMode && button.dataset.symbol === currentGridSymbol);
+      });
+      if (symbolInputMode) closeGridChordPopup();
     }
 
     function commitGridInputChange(input) {
@@ -3462,9 +3557,19 @@ Ending:
       });
       input.addEventListener("click", event => {
         event.stopPropagation();
+        activeGridInput = input;
+        if (symbolInputMode) {
+          closeGridChordPopup();
+          applyGridSymbol(currentGridSymbol);
+          return;
+        }
         openGridChordPopup(input);
       });
       input.addEventListener("focus", () => {
+        if (symbolInputMode) {
+          closeGridChordPopup();
+          return;
+        }
         openGridChordPopup(input);
       });
       input.addEventListener("input", () => {
@@ -3473,15 +3578,22 @@ Ending:
         previewSelectedGridMeasureFromInputs();
       });
     });
+    els.symbolModeBtn.addEventListener("click", () => {
+      setSymbolInputMode(!symbolInputMode);
+    });
     els.gridSymbolButtons.forEach(button => {
       button.addEventListener("click", () => {
         sourceEditArmed = false;
+        setSymbolInputMode(true, button.dataset.symbol);
         applyGridSymbol(button.dataset.symbol);
       });
     });
     els.clearGridSymbolBtn.addEventListener("click", () => {
       sourceEditArmed = false;
       clearGridSymbol();
+    });
+    els.undoToastBtn.addEventListener("click", () => {
+      undoSourceEdit();
     });
     document.addEventListener("click", event => {
       if (!gridChordPopup || !gridChordPopup.classList.contains("open")) return;
@@ -3735,12 +3847,18 @@ Ending:
       els.textView.classList.toggle("hidden", view !== "text");
     }
 
+    function currentScrollSpeed() {
+      const raw = Number.parseFloat(els.scrollSpeedInput.value);
+      const amount = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) / 100 : .38;
+      return 4 + Math.pow(amount, 1.45) * 86;
+    }
+
     function autoScrollStep(timestamp) {
       if (!autoScrollRunning) return;
       if (!autoScrollLastTime) autoScrollLastTime = timestamp;
       const deltaSeconds = Math.min(.08, (timestamp - autoScrollLastTime) / 1000);
       autoScrollLastTime = timestamp;
-      const speed = Number.parseFloat(els.scrollSpeedInput.value) || 36;
+      const speed = currentScrollSpeed();
       const scroller = document.scrollingElement || document.documentElement;
       const maxScroll = scroller.scrollHeight - scroller.clientHeight;
       if (scroller.scrollTop >= maxScroll - 2) {
