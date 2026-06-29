@@ -801,7 +801,8 @@
     }
 
     .scroll-control {
-      display: inline-flex;
+      display: inline-grid;
+      grid-template-columns: auto auto auto minmax(180px, 360px) auto auto;
       align-items: center;
       gap: 8px;
       min-height: 42px;
@@ -815,7 +816,7 @@
     }
 
     .scroll-control input {
-      width: 360px;
+      width: 100%;
       min-height: 0;
       padding: 0;
       accent-color: var(--cyan);
@@ -827,6 +828,24 @@
       padding: 3px 8px;
       font-size: 12px;
       font-weight: 850;
+    }
+
+    .scroll-range-settings {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: auto minmax(66px, 82px) auto minmax(66px, 82px);
+      gap: 6px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .scroll-range-settings input {
+      width: 100%;
+      min-height: 30px;
+      padding: 4px 6px;
+      font-size: 12px;
     }
 
     .scroll-step-btn {
@@ -1459,10 +1478,17 @@
 
       .scroll-control {
         flex: 1 1 180px;
+        grid-template-columns: auto auto auto minmax(90px, 1fr) auto;
       }
 
       .scroll-control input {
         width: 100%;
+      }
+
+      .scroll-speed-value {
+        grid-column: 1 / -1;
+        width: 100%;
+        text-align: left;
       }
     }
 
@@ -1815,8 +1841,8 @@
           <button id="copyBtn">コピー</button>
           <button id="printBtn">印刷</button>
           <button id="autoScrollBtn" type="button">スクロール</button>
-          <label class="scroll-control" for="scrollSpeedInput">
-            速度
+          <div class="scroll-control">
+            <span>速度</span>
             <select id="scrollProfileInput" aria-label="スクロール用途">
               <option value="auto" selected>自動</option>
               <option value="pc">PC</option>
@@ -1825,8 +1851,14 @@
             <button id="scrollSpeedDownBtn" class="scroll-step-btn" type="button" aria-label="速度を下げる">−</button>
             <input id="scrollSpeedInput" type="range" min="0" max="200" step="1" value="70">
             <button id="scrollSpeedUpBtn" class="scroll-step-btn" type="button" aria-label="速度を上げる">＋</button>
-            <span id="scrollSpeedValue" class="scroll-speed-value">70 / 37px/s</span>
-          </label>
+            <span id="scrollSpeedValue" class="scroll-speed-value">50.0 / 39.0px/s PC</span>
+            <div class="scroll-range-settings">
+              <span>最小</span>
+              <input id="scrollMinInput" type="number" min="0" max="200" step="1" value="6">
+              <span>最大</span>
+              <input id="scrollMaxInput" type="number" min="1" max="240" step="1" value="72">
+            </div>
+          </div>
         </div>
       </div>
       <div class="status" id="status"></div>
@@ -1951,6 +1983,8 @@ Ending:
       scrollSpeedUpBtn: document.querySelector("#scrollSpeedUpBtn"),
       scrollSpeedInput: document.querySelector("#scrollSpeedInput"),
       scrollSpeedValue: document.querySelector("#scrollSpeedValue"),
+      scrollMinInput: document.querySelector("#scrollMinInput"),
+      scrollMaxInput: document.querySelector("#scrollMaxInput"),
       sheetView: document.querySelector("#sheetView"),
       gridView: document.querySelector("#gridView"),
       chartView: document.querySelector("#chartView"),
@@ -1983,6 +2017,10 @@ Ending:
     let autoScrollLastTime = 0;
     let autoScrollCarry = 0;
     let sheetTapStart = null;
+    let scrollSpeedRanges = {
+      pc: { min: 6, max: 72 },
+      mobile: { min: 4, max: 90 }
+    };
 
     function saveState() {
       const state = {
@@ -1992,6 +2030,7 @@ Ending:
         bpm: els.bpmInput.value,
         meter: els.meterInput.value,
         colors: currentColors(),
+        scrollSpeedRanges,
         chart: els.sourceInput.value
       };
       localStorage.setItem(storageKey, JSON.stringify(state));
@@ -3742,6 +3781,12 @@ Ending:
       } else {
         applyColors();
       }
+      if (saved.scrollSpeedRanges) {
+        scrollSpeedRanges = {
+          pc: { ...scrollSpeedRanges.pc, ...(saved.scrollSpeedRanges.pc || {}) },
+          mobile: { ...scrollSpeedRanges.mobile, ...(saved.scrollSpeedRanges.mobile || {}) }
+        };
+      }
       sourceChart = saved.chart || defaultChart;
       els.sourceInput.value = sourceChart;
       currentShift = saved.targetKey && keyIndex(saved.targetKey) !== undefined
@@ -3895,9 +3940,14 @@ Ending:
     }
 
     function scrollProfileRange(profile = activeScrollProfile()) {
-      return profile === "mobile"
-        ? { min: 120, max: 175, value: 145 }
-        : { min: 150, max: 178, value: 164 };
+      return { min: 0, max: 100, value: 50 };
+    }
+
+    function scrollSpeedRange(profile = activeScrollProfile()) {
+      const base = scrollSpeedRanges[profile] || scrollSpeedRanges.pc;
+      const min = Math.max(0, Number.parseFloat(base.min) || 0);
+      const max = Math.max(min + 1, Number.parseFloat(base.max) || min + 1);
+      return { min, max };
     }
 
     function applyScrollProfileRange(keepRatio = true) {
@@ -3911,20 +3961,24 @@ Ending:
       const range = scrollProfileRange();
       input.min = String(range.min);
       input.max = String(range.max);
-      input.step = activeScrollProfile() === "pc" ? "0.1" : "0.5";
+      input.step = "1";
       const nextRatio = keepRatio ? Math.max(0, Math.min(1, oldRatio)) : .5;
       input.value = String(range.min + (range.max - range.min) * nextRatio);
+      const speedRange = scrollSpeedRange();
+      els.scrollMinInput.value = String(speedRange.min);
+      els.scrollMaxInput.value = String(speedRange.max);
       updateScrollSpeedValue();
     }
 
     function currentScrollSpeed() {
       const raw = Number.parseFloat(els.scrollSpeedInput.value);
-      const normalizedRaw = Number.isFinite(raw) ? raw : scrollProfileRange().value;
-      if (activeScrollProfile() === "mobile") {
-        const amount = Math.max(0, Math.min(200, normalizedRaw)) / 200;
-        return 4 + Math.pow(amount, 1.45) * 86;
-      }
-      return 18 + (Math.max(0, Math.min(200, normalizedRaw)) / 200) * 54;
+      const range = scrollProfileRange();
+      const value = Number.isFinite(raw) ? raw : range.value;
+      const amount = range.max > range.min
+        ? Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)))
+        : .5;
+      const speedRange = scrollSpeedRange();
+      return speedRange.min + amount * (speedRange.max - speedRange.min);
     }
 
     function updateScrollSpeedValue() {
@@ -3933,6 +3987,17 @@ Ending:
       const speed = currentScrollSpeed();
       const mode = activeScrollProfile() === "mobile" ? "SP" : "PC";
       els.scrollSpeedValue.textContent = `${raw.toFixed(1)} / ${speed.toFixed(1)}px/s ${mode}`;
+    }
+
+    function updateActiveScrollSpeedRange() {
+      const profile = activeScrollProfile();
+      const min = Math.max(0, Number.parseFloat(els.scrollMinInput.value) || 0);
+      const rawMax = Number.parseFloat(els.scrollMaxInput.value);
+      const max = Math.max(min + 1, Number.isFinite(rawMax) ? rawMax : min + 1);
+      scrollSpeedRanges[profile] = { min, max };
+      els.scrollMaxInput.value = String(max);
+      updateScrollSpeedValue();
+      saveState();
     }
 
     function nudgeScrollSpeed(direction) {
@@ -4112,6 +4177,8 @@ Ending:
     els.scrollSpeedInput.addEventListener("input", updateScrollSpeedValue);
     els.scrollProfileInput.addEventListener("click", event => event.stopPropagation());
     els.scrollProfileInput.addEventListener("change", () => applyScrollProfileRange(false));
+    els.scrollMinInput.addEventListener("input", updateActiveScrollSpeedRange);
+    els.scrollMaxInput.addEventListener("input", updateActiveScrollSpeedRange);
     bindHoldButton(els.scrollSpeedDownBtn, -1);
     bindHoldButton(els.scrollSpeedUpBtn, 1);
     window.addEventListener("resize", () => applyScrollProfileRange(true));
