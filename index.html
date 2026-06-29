@@ -816,6 +816,15 @@
     .beat-grid-measure,
     .beat-grid-lyric,
     .beat-slot {
+      cursor: default;
+    }
+
+    body.edit-mode .sheet-line,
+    body.edit-mode .sheet-measure,
+    body.edit-mode .bar,
+    body.edit-mode .beat-grid-measure,
+    body.edit-mode .beat-grid-lyric,
+    body.edit-mode .beat-slot {
       cursor: text;
     }
 
@@ -837,7 +846,7 @@
       transition: background .14s ease, box-shadow .14s ease;
     }
 
-    .sheet-measure:hover {
+    body.edit-mode .sheet-measure:hover {
       background: rgba(40, 242, 238, .1);
       box-shadow: inset 0 -2px 0 rgba(40, 242, 238, .28);
     }
@@ -1656,6 +1665,7 @@
           <p id="metaLine">Key E / BPM 122</p>
         </div>
         <div class="actions">
+          <button id="editModeBtn" type="button">編集</button>
           <button id="copyBtn">コピー</button>
           <button id="printBtn">印刷</button>
           <button id="autoScrollBtn" type="button">スクロール</button>
@@ -1773,6 +1783,7 @@ Ending:
       clearGridSymbolBtn: document.querySelector("#clearGridSymbolBtn"),
       sourceInput: document.querySelector("#sourceInput"),
       editingLineInfo: document.querySelector("#editingLineInfo"),
+      editModeBtn: document.querySelector("#editModeBtn"),
       autoScrollBtn: document.querySelector("#autoScrollBtn"),
       scrollSpeedInput: document.querySelector("#scrollSpeedInput"),
       sheetView: document.querySelector("#sheetView"),
@@ -1794,9 +1805,11 @@ Ending:
     let selectedGridEdit = null;
     let gridChordPopup = null;
     let sourceEditArmed = true;
+    let editMode = false;
     let autoScrollRunning = false;
     let autoScrollFrame = null;
     let autoScrollLastTime = 0;
+    let sheetTapStart = null;
 
     function saveState() {
       const state = {
@@ -3444,18 +3457,21 @@ Ending:
     });
 
     els.sheetView.addEventListener("click", event => {
+      if (!editMode) return;
       const target = event.target.closest(".sheet-measure, [data-source-line]");
       if (!target) return;
       selectEditableTarget(target, "譜面から小節を選択しました", "譜面から行を選択しました");
     });
 
     els.chartView.addEventListener("click", event => {
+      if (!editMode) return;
       const target = event.target.closest(".bar, .lyric-line, .cue-line, [data-source-line]");
       if (!target) return;
       selectEditableTarget(target, "カードから小節を選択しました", "カードから行を選択しました");
     });
 
     els.gridView.addEventListener("click", event => {
+      if (!editMode) return;
       const slot = event.target.closest(".beat-slot");
       const target = slot || event.target.closest(".beat-grid-measure, .beat-grid-lyric");
       if (!target) return;
@@ -3463,6 +3479,7 @@ Ending:
     });
 
     els.gridView.addEventListener("keydown", event => {
+      if (!editMode) return;
       const slot = event.target.closest(".beat-slot");
       if (!slot) return;
       if (event.key === "Enter") {
@@ -3476,6 +3493,7 @@ Ending:
     });
 
     els.gridView.addEventListener("focus", event => {
+      if (!editMode) return;
       const slot = event.target.closest(".beat-slot");
       if (!slot) return;
       setSelectedGridEditFromElement(slot);
@@ -3487,6 +3505,7 @@ Ending:
     }, true);
 
     els.gridView.addEventListener("blur", event => {
+      if (!editMode) return;
       const slot = event.target.closest(".beat-slot");
       if (slot) commitBeatSlotEdit(slot);
     }, true);
@@ -3691,21 +3710,61 @@ Ending:
       }
     }
 
+    function setEditMode(enabled) {
+      editMode = enabled;
+      document.body.classList.toggle("edit-mode", editMode);
+      els.editModeBtn.classList.toggle("active", editMode);
+      els.editModeBtn.textContent = editMode ? "編集中" : "編集";
+      if (editMode) {
+        stopAutoScroll();
+      } else {
+        selectedGridEdit = null;
+        markSelectedGridEdit();
+      }
+    }
+
+    function shouldIgnoreSheetTap(target) {
+      return Boolean(target.closest("button, input, select, textarea, label, .scroll-control"));
+    }
+
     els.sheetBtn.addEventListener("click", () => setView("sheet"));
     els.gridBtn.addEventListener("click", () => setView("grid"));
     els.chartBtn.addEventListener("click", () => setView("chart"));
     els.textBtn.addEventListener("click", () => setView("text"));
+    els.editModeBtn.addEventListener("click", event => {
+      event.stopPropagation();
+      setEditMode(!editMode);
+    });
     els.autoScrollBtn.addEventListener("click", event => {
       event.stopPropagation();
       toggleAutoScroll();
     });
     els.scrollSpeedInput.addEventListener("click", event => event.stopPropagation());
     els.scrollSpeedInput.addEventListener("pointerdown", event => event.stopPropagation());
-    document.querySelector(".sheet").addEventListener("click", event => {
-      if (event.target.closest(".selected-edit-target, button, input, select, textarea")) return;
-      if (window.innerWidth <= 900) {
-        toggleAutoScroll();
+    const sheetPanel = document.querySelector(".sheet");
+    sheetPanel.addEventListener("pointerdown", event => {
+      if (editMode || shouldIgnoreSheetTap(event.target)) return;
+      sheetTapStart = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        time: performance.now()
+      };
+    });
+    sheetPanel.addEventListener("pointerup", event => {
+      if (editMode || shouldIgnoreSheetTap(event.target) || !sheetTapStart) return;
+      if (sheetTapStart.pointerId !== event.pointerId) {
+        sheetTapStart = null;
+        return;
       }
+      const distance = Math.hypot(event.clientX - sheetTapStart.x, event.clientY - sheetTapStart.y);
+      const elapsed = performance.now() - sheetTapStart.time;
+      sheetTapStart = null;
+      if (distance > 12 || elapsed > 650) return;
+      toggleAutoScroll();
+    });
+    sheetPanel.addEventListener("pointercancel", () => {
+      sheetTapStart = null;
     });
     window.addEventListener("wheel", () => {
       if (autoScrollRunning) stopAutoScroll();
