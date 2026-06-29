@@ -815,7 +815,7 @@
     }
 
     .scroll-control input {
-      width: 220px;
+      width: 360px;
       min-height: 0;
       padding: 0;
       accent-color: var(--cyan);
@@ -1789,7 +1789,7 @@
           <button id="autoScrollBtn" type="button">スクロール</button>
           <label class="scroll-control" for="scrollSpeedInput">
             速度
-            <input id="scrollSpeedInput" type="range" min="0" max="100" step="1" value="38">
+            <input id="scrollSpeedInput" type="range" min="0" max="200" step="1" value="70">
           </label>
         </div>
       </div>
@@ -3849,8 +3849,12 @@ Ending:
 
     function currentScrollSpeed() {
       const raw = Number.parseFloat(els.scrollSpeedInput.value);
-      const amount = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) / 100 : .38;
-      return 4 + Math.pow(amount, 1.45) * 86;
+      const maxValue = Number.parseFloat(els.scrollSpeedInput.max) || 200;
+      const amount = Number.isFinite(raw) ? Math.max(0, Math.min(maxValue, raw)) / maxValue : .35;
+      if (window.innerWidth <= 900) {
+        return 4 + Math.pow(amount, 1.45) * 86;
+      }
+      return 2 + Math.pow(amount, 1.25) * 34;
     }
 
     function autoScrollStep(timestamp) {
