@@ -829,6 +829,17 @@
       font-weight: 850;
     }
 
+    .scroll-step-btn {
+      min-width: 34px;
+      min-height: 34px;
+      padding: 0 9px;
+      display: inline-grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 950;
+      line-height: 1;
+    }
+
     .scroll-speed-value {
       min-width: 92px;
       color: var(--cyan-2);
@@ -1811,7 +1822,9 @@
               <option value="pc">PC</option>
               <option value="mobile">スマホ</option>
             </select>
+            <button id="scrollSpeedDownBtn" class="scroll-step-btn" type="button" aria-label="速度を下げる">−</button>
             <input id="scrollSpeedInput" type="range" min="0" max="200" step="1" value="70">
+            <button id="scrollSpeedUpBtn" class="scroll-step-btn" type="button" aria-label="速度を上げる">＋</button>
             <span id="scrollSpeedValue" class="scroll-speed-value">70 / 37px/s</span>
           </label>
         </div>
@@ -1934,6 +1947,8 @@ Ending:
       projectorBtn: document.querySelector("#projectorBtn"),
       autoScrollBtn: document.querySelector("#autoScrollBtn"),
       scrollProfileInput: document.querySelector("#scrollProfileInput"),
+      scrollSpeedDownBtn: document.querySelector("#scrollSpeedDownBtn"),
+      scrollSpeedUpBtn: document.querySelector("#scrollSpeedUpBtn"),
       scrollSpeedInput: document.querySelector("#scrollSpeedInput"),
       scrollSpeedValue: document.querySelector("#scrollSpeedValue"),
       sheetView: document.querySelector("#sheetView"),
@@ -3881,8 +3896,8 @@ Ending:
 
     function scrollProfileRange(profile = activeScrollProfile()) {
       return profile === "mobile"
-        ? { min: 145, max: 175, value: 160 }
-        : { min: 173, max: 178, value: 175 };
+        ? { min: 120, max: 175, value: 145 }
+        : { min: 150, max: 178, value: 164 };
     }
 
     function applyScrollProfileRange(keepRatio = true) {
@@ -3918,6 +3933,40 @@ Ending:
       const speed = currentScrollSpeed();
       const mode = activeScrollProfile() === "mobile" ? "SP" : "PC";
       els.scrollSpeedValue.textContent = `${raw.toFixed(1)} / ${speed.toFixed(1)}px/s ${mode}`;
+    }
+
+    function nudgeScrollSpeed(direction) {
+      const input = els.scrollSpeedInput;
+      const step = Number.parseFloat(input.step) || 1;
+      const min = Number.parseFloat(input.min) || 0;
+      const max = Number.parseFloat(input.max) || 200;
+      const current = Number.parseFloat(input.value) || min;
+      const next = Math.max(min, Math.min(max, current + direction * step));
+      input.value = String(next);
+      updateScrollSpeedValue();
+    }
+
+    function bindHoldButton(button, direction) {
+      let holdTimer = null;
+      let repeatTimer = null;
+      const stop = () => {
+        clearTimeout(holdTimer);
+        clearInterval(repeatTimer);
+        holdTimer = null;
+        repeatTimer = null;
+      };
+      button.addEventListener("pointerdown", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        nudgeScrollSpeed(direction);
+        holdTimer = setTimeout(() => {
+          repeatTimer = setInterval(() => nudgeScrollSpeed(direction), 90);
+        }, 360);
+      });
+      button.addEventListener("pointerup", stop);
+      button.addEventListener("pointerleave", stop);
+      button.addEventListener("pointercancel", stop);
+      button.addEventListener("click", event => event.stopPropagation());
     }
 
     function autoScrollStep(timestamp) {
@@ -4063,6 +4112,8 @@ Ending:
     els.scrollSpeedInput.addEventListener("input", updateScrollSpeedValue);
     els.scrollProfileInput.addEventListener("click", event => event.stopPropagation());
     els.scrollProfileInput.addEventListener("change", () => applyScrollProfileRange(false));
+    bindHoldButton(els.scrollSpeedDownBtn, -1);
+    bindHoldButton(els.scrollSpeedUpBtn, 1);
     window.addEventListener("resize", () => applyScrollProfileRange(true));
     const sheetPanel = document.querySelector(".sheet");
     sheetPanel.addEventListener("pointerdown", event => {
