@@ -821,6 +821,14 @@
       accent-color: var(--cyan);
     }
 
+    .scroll-control select {
+      width: auto;
+      min-height: 32px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
     .scroll-speed-value {
       min-width: 92px;
       color: var(--cyan-2);
@@ -1798,6 +1806,11 @@
           <button id="autoScrollBtn" type="button">スクロール</button>
           <label class="scroll-control" for="scrollSpeedInput">
             速度
+            <select id="scrollProfileInput" aria-label="スクロール用途">
+              <option value="auto" selected>自動</option>
+              <option value="pc">PC</option>
+              <option value="mobile">スマホ</option>
+            </select>
             <input id="scrollSpeedInput" type="range" min="0" max="200" step="1" value="70">
             <span id="scrollSpeedValue" class="scroll-speed-value">70 / 37px/s</span>
           </label>
@@ -1920,6 +1933,7 @@ Ending:
       collapseEditorBtn: document.querySelector("#collapseEditorBtn"),
       projectorBtn: document.querySelector("#projectorBtn"),
       autoScrollBtn: document.querySelector("#autoScrollBtn"),
+      scrollProfileInput: document.querySelector("#scrollProfileInput"),
       scrollSpeedInput: document.querySelector("#scrollSpeedInput"),
       scrollSpeedValue: document.querySelector("#scrollSpeedValue"),
       sheetView: document.querySelector("#sheetView"),
@@ -1952,6 +1966,7 @@ Ending:
     let autoScrollRunning = false;
     let autoScrollFrame = null;
     let autoScrollLastTime = 0;
+    let autoScrollCarry = 0;
     let sheetTapStart = null;
 
     function saveState() {
@@ -3858,22 +3873,51 @@ Ending:
       els.textView.classList.toggle("hidden", view !== "text");
     }
 
+    function activeScrollProfile() {
+      const selected = els.scrollProfileInput.value;
+      if (selected === "pc" || selected === "mobile") return selected;
+      return window.innerWidth <= 900 ? "mobile" : "pc";
+    }
+
+    function scrollProfileRange(profile = activeScrollProfile()) {
+      return profile === "mobile"
+        ? { min: 145, max: 175, value: 160 }
+        : { min: 173, max: 178, value: 175 };
+    }
+
+    function applyScrollProfileRange(keepRatio = true) {
+      const input = els.scrollSpeedInput;
+      const oldMin = Number.parseFloat(input.min) || 0;
+      const oldMax = Number.parseFloat(input.max) || 200;
+      const oldValue = Number.parseFloat(input.value);
+      const oldRatio = oldMax > oldMin && Number.isFinite(oldValue)
+        ? (oldValue - oldMin) / (oldMax - oldMin)
+        : .5;
+      const range = scrollProfileRange();
+      input.min = String(range.min);
+      input.max = String(range.max);
+      input.step = activeScrollProfile() === "pc" ? "0.1" : "0.5";
+      const nextRatio = keepRatio ? Math.max(0, Math.min(1, oldRatio)) : .5;
+      input.value = String(range.min + (range.max - range.min) * nextRatio);
+      updateScrollSpeedValue();
+    }
+
     function currentScrollSpeed() {
       const raw = Number.parseFloat(els.scrollSpeedInput.value);
-      const maxValue = Number.parseFloat(els.scrollSpeedInput.max) || 200;
-      const amount = Number.isFinite(raw) ? Math.max(0, Math.min(maxValue, raw)) / maxValue : .35;
-      if (window.innerWidth <= 900) {
+      const normalizedRaw = Number.isFinite(raw) ? raw : scrollProfileRange().value;
+      if (activeScrollProfile() === "mobile") {
+        const amount = Math.max(0, Math.min(200, normalizedRaw)) / 200;
         return 4 + Math.pow(amount, 1.45) * 86;
       }
-      return 18 + amount * 54;
+      return 18 + (Math.max(0, Math.min(200, normalizedRaw)) / 200) * 54;
     }
 
     function updateScrollSpeedValue() {
       if (!els.scrollSpeedValue) return;
       const raw = Number.parseFloat(els.scrollSpeedInput.value) || 0;
       const speed = currentScrollSpeed();
-      const mode = window.innerWidth <= 900 ? "SP" : "PC";
-      els.scrollSpeedValue.textContent = `${Math.round(raw)} / ${speed.toFixed(1)}px/s ${mode}`;
+      const mode = activeScrollProfile() === "mobile" ? "SP" : "PC";
+      els.scrollSpeedValue.textContent = `${raw.toFixed(1)} / ${speed.toFixed(1)}px/s ${mode}`;
     }
 
     function autoScrollStep(timestamp) {
@@ -3893,7 +3937,14 @@ Ending:
         stopAutoScroll();
         return;
       }
-      const nextTop = currentTop + speed * deltaSeconds;
+      autoScrollCarry += speed * deltaSeconds;
+      const wholePixels = Math.trunc(autoScrollCarry);
+      if (wholePixels === 0) {
+        autoScrollFrame = requestAnimationFrame(autoScrollStep);
+        return;
+      }
+      autoScrollCarry -= wholePixels;
+      const nextTop = currentTop + wholePixels;
       window.scrollTo(0, nextTop);
       scroller.scrollTop = nextTop;
       autoScrollFrame = requestAnimationFrame(autoScrollStep);
@@ -3903,6 +3954,7 @@ Ending:
       if (autoScrollRunning) return;
       autoScrollRunning = true;
       autoScrollLastTime = 0;
+      autoScrollCarry = 0;
       document.body.classList.add("auto-scroll-active");
       els.autoScrollBtn.classList.add("active");
       els.autoScrollBtn.textContent = "停止";
@@ -3912,6 +3964,7 @@ Ending:
     function stopAutoScroll() {
       autoScrollRunning = false;
       autoScrollLastTime = 0;
+      autoScrollCarry = 0;
       document.body.classList.remove("auto-scroll-active");
       els.autoScrollBtn.classList.remove("active");
       els.autoScrollBtn.textContent = "スクロール";
@@ -4008,7 +4061,9 @@ Ending:
     els.scrollSpeedInput.addEventListener("click", event => event.stopPropagation());
     els.scrollSpeedInput.addEventListener("pointerdown", event => event.stopPropagation());
     els.scrollSpeedInput.addEventListener("input", updateScrollSpeedValue);
-    window.addEventListener("resize", updateScrollSpeedValue);
+    els.scrollProfileInput.addEventListener("click", event => event.stopPropagation());
+    els.scrollProfileInput.addEventListener("change", () => applyScrollProfileRange(false));
+    window.addEventListener("resize", () => applyScrollProfileRange(true));
     const sheetPanel = document.querySelector(".sheet");
     sheetPanel.addEventListener("pointerdown", event => {
       if (editMode || shouldIgnoreSheetTap(event.target)) return;
@@ -4047,7 +4102,7 @@ Ending:
     });
     document.querySelector("#printBtn").addEventListener("click", () => window.print());
 
-    updateScrollSpeedValue();
+    applyScrollProfileRange(false);
     update();
   </script>
 </body>
